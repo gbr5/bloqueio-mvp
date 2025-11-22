@@ -2,11 +2,14 @@
 
 import { JSX, useState } from 'react';
 
-const INNER_SIZE = 9; // área "jogável" original
-const SIZE = INNER_SIZE + 2; // adiciona 1 linha/coluna em cada lado → 11x11
+// Tabuleiro original interno é 9x9, com uma borda extra em volta
+const INNER_SIZE = 9;
+const SIZE = INNER_SIZE + 2; // 11x11 com bordas
 
 const COL_LABELS = 'ABCDEFGHI'.split('');
-const ROW_LABELS = Array.from({ length: INNER_SIZE }, (_, i) => String(i + 1));
+const ROW_LABELS = Array.from({ length: INNER_SIZE }, (_, i) =>
+  String(i + 1),
+);
 
 type PlayerId = 0 | 1 | 2 | 3;
 type GoalSide = 'TOP' | 'RIGHT' | 'BOTTOM' | 'LEFT';
@@ -23,7 +26,6 @@ type Player = {
 };
 
 type Mode = 'move' | 'wall';
-
 type Cell = { row: number; col: number };
 
 type BarrierOrientation = 'H' | 'V';
@@ -62,7 +64,7 @@ function isInside(row: number, col: number) {
   return row >= 0 && row < SIZE && col >= 0 && col < SIZE;
 }
 
-// Agora o objetivo é alcançar a BORDA externa (0 ou SIZE-1)
+// Objetivo é alcançar a BORDA externa (0 ou SIZE-1)
 function isGoal(row: number, col: number, goalSide: GoalSide) {
   switch (goalSide) {
     case 'TOP':
@@ -77,7 +79,7 @@ function isGoal(row: number, col: number, goalSide: GoalSide) {
 }
 
 function createInitialPlayers(): Player[] {
-  const mid = Math.floor(SIZE / 2); // centro do tabuleiro 11x11
+  const mid = Math.floor(SIZE / 2); // centro do 11x11
   return [
     {
       id: 0,
@@ -136,7 +138,7 @@ function goalDistance(player: Player, row: number, col: number): number {
   }
 }
 
-// BFS para checar se ainda existe caminho livre até o lado objetivo
+// BFS para checar se ainda existe algum caminho (pode andar pra trás)
 function hasPathToGoal(
   player: Player,
   blockedEdges: Set<string>,
@@ -172,7 +174,52 @@ function hasPathToGoal(
   return false;
 }
 
-// Versão genérica do movimento (usa um conjunto de paredes passado por parâmetro)
+// BFS "monótono": só anda por casas cuja distância ao objetivo
+// NUNCA aumenta. Garante que sempre exista um caminho que nunca
+// obriga o jogador a andar pra trás em relação ao objetivo.
+function hasMonotonePathToGoal(
+  player: Player,
+  blockedEdges: Set<string>,
+): boolean {
+  const visited = Array.from({ length: SIZE }, () =>
+    Array(SIZE).fill(false),
+  );
+  const queue: Cell[] = [{ row: player.row, col: player.col }];
+  visited[player.row][player.col] = true;
+
+  const directions = [
+    { dr: -1, dc: 0 },
+    { dr: 1, dc: 0 },
+    { dr: 0, dc: -1 },
+    { dr: 0, dc: 1 },
+  ];
+
+  while (queue.length > 0) {
+    const { row, col } = queue.shift() as Cell;
+    if (isGoal(row, col, player.goalSide)) return true;
+
+    const distHere = goalDistance(player, row, col);
+
+    for (const { dr, dc } of directions) {
+      const nr = row + dr;
+      const nc = col + dc;
+      if (!isInside(nr, nc)) continue;
+      if (blockedEdges.has(edgeKey(row, col, nr, nc))) continue;
+
+      const distNext = goalDistance(player, nr, nc);
+      // não pode piorar a distância em relação à casa atual
+      if (distNext > distHere) continue;
+      if (visited[nr][nc]) continue;
+
+      visited[nr][nc] = true;
+      queue.push({ row: nr, col: nc });
+    }
+  }
+
+  return false;
+}
+
+// Versão genérica do movimento (com paredes arbitrárias e todos os peões)
 function canPawnMoveTo(
   player: Player,
   destRow: number,
@@ -193,7 +240,7 @@ function canPawnMoveTo(
     return false;
   }
 
-  // destino não pode estar ocupado por outro peão
+  // destino não pode estar ocupado
   const occupied = players.some(
     (p) => p.id !== player.id && p.row === destRow && p.col === destCol,
   );
@@ -205,7 +252,7 @@ function canPawnMoveTo(
   const adc = Math.abs(dc);
   const manhattan = adr + adc;
 
-  // 1) movimento normal: 1 casa ortogonal
+  // 1) passo normal
   if (manhattan === 1) {
     if (blockedEdges.has(edgeKey(player.row, player.col, destRow, destCol))) {
       return false;
@@ -213,7 +260,7 @@ function canPawnMoveTo(
     return true;
   }
 
-  // 2) pulo: 2 casas em linha reta
+  // 2) pulo em linha reta (2 casas)
   const isStraightTwo =
     (adr === 2 && adc === 0) || (adr === 0 && adc === 2);
   if (!isStraightTwo) return false;
@@ -240,54 +287,6 @@ function canPawnMoveTo(
   return true;
 }
 
-// Regra extra: após uma barreira, cada jogador deve ter pelo menos
-// um movimento legal (passo ou pulo) que NÃO aumenta a distância ao objetivo
-function hasNonRegressiveMove(
-  player: Player,
-  blockedEdges: Set<string>,
-  players: Player[],
-): boolean {
-  const currentDist = goalDistance(player, player.row, player.col);
-
-  const candidates: Array<{ row: number; col: number }> = [];
-
-  // vizinhos imediatos
-  const deltas1 = [
-    { dr: -1, dc: 0 },
-    { dr: 1, dc: 0 },
-    { dr: 0, dc: -1 },
-    { dr: 0, dc: 1 },
-  ];
-  for (const { dr, dc } of deltas1) {
-    candidates.push({ row: player.row + dr, col: player.col + dc });
-  }
-
-  // candidatos de pulo (2 casas em linha reta)
-  const deltas2 = [
-    { dr: -2, dc: 0 },
-    { dr: 2, dc: 0 },
-    { dr: 0, dc: -2 },
-    { dr: 0, dc: 2 },
-  ];
-  for (const { dr, dc } of deltas2) {
-    candidates.push({ row: player.row + dr, col: player.col + dc });
-  }
-
-  for (const dest of candidates) {
-    if (!isInside(dest.row, dest.col)) continue;
-    if (!canPawnMoveTo(player, dest.row, dest.col, blockedEdges, players)) {
-      continue;
-    }
-    const distAfter = goalDistance(player, dest.row, dest.col);
-    if (distAfter <= currentDist) {
-      // tem pelo menos uma jogada que não piora a distância até o objetivo
-      return true;
-    }
-  }
-
-  return false;
-}
-
 export default function BloqueioPage() {
   const [players, setPlayers] = useState<Player[]>(() =>
     createInitialPlayers(),
@@ -301,7 +300,7 @@ export default function BloqueioPage() {
   const [winner, setWinner] = useState<PlayerId | null>(null);
   const [history, setHistory] = useState<GameSnapshot[]>([]);
   const [wallOrientation, setWallOrientation] =
-    useState<BarrierOrientation>('H'); // padrão: horizontal
+    useState<BarrierOrientation>('H');
   const [hoveredCell, setHoveredCell] = useState<Cell | null>(null);
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId)!;
@@ -345,8 +344,6 @@ export default function BloqueioPage() {
     });
   }
 
-  // ---- validações puras (usadas em hover e no clique) ----
-
   function canMoveTo(row: number, col: number): boolean {
     if (winner !== null) return false;
     const cur = currentPlayer;
@@ -379,9 +376,7 @@ export default function BloqueioPage() {
     }
 
     if (currentPlayer.wallsLeft <= 0) {
-      if (!silent) {
-        alert('Você não tem mais barreiras disponíveis.');
-      }
+      if (!silent) alert('Você não tem mais barreiras disponíveis.');
       return {
         ok: false,
         baseRow: 0,
@@ -391,34 +386,50 @@ export default function BloqueioPage() {
       };
     }
 
-    // clamp: mantém o bloco 2x2 sempre entre linhas/colunas 1..SIZE-3
-    // (nunca usa as casas de trás das bases coloridas: linha/coluna 0 ou SIZE-1)
-    const baseRow = Math.max(1, Math.min(clickRow, SIZE - 3));
-    const baseCol = Math.max(1, Math.min(clickCol, SIZE - 3));
+    // Barreiras podem encostar na faixa colorida,
+    // então baseRow/baseCol vão de 0 até SIZE-2.
+    const baseRow = Math.max(1, Math.min(clickRow, SIZE - 2));
+    const baseCol = Math.max(1, Math.min(clickCol, SIZE - 2));
 
     const edgesToAdd: string[] = [];
     const orientation = wallOrientation;
 
     if (orientation === 'H') {
-      // barreira horizontal entre linhas baseRow e baseRow+1, cobrindo duas colunas
+      // barreira horizontal entre baseRow e baseRow+1, cobrindo duas colunas
+      if (baseRow + 1 >= SIZE || baseCol + 1 >= SIZE) {
+        return {
+          ok: false,
+          baseRow,
+          baseCol,
+          orientation,
+          edgesToAdd,
+        };
+      }
       edgesToAdd.push(edgeKey(baseRow, baseCol, baseRow + 1, baseCol));
       edgesToAdd.push(
         edgeKey(baseRow, baseCol + 1, baseRow + 1, baseCol + 1),
       );
     } else {
-      // barreira vertical entre colunas baseCol e baseCol+1, cobrindo duas linhas
+      // barreira vertical entre baseCol e baseCol+1, cobrindo duas linhas
+      if (baseRow + 1 >= SIZE || baseCol + 1 >= SIZE) {
+        return {
+          ok: false,
+          baseRow,
+          baseCol,
+          orientation,
+          edgesToAdd,
+        };
+      }
       edgesToAdd.push(edgeKey(baseRow, baseCol, baseRow, baseCol + 1));
       edgesToAdd.push(
         edgeKey(baseRow + 1, baseCol, baseRow + 1, baseCol + 1),
       );
     }
 
-    // 1) não pode reutilizar nenhuma aresta já bloqueada
+    // 1) não pode reutilizar arestas
     const anyAlreadyBlocked = edgesToAdd.some((e) => blockedEdges.has(e));
     if (anyAlreadyBlocked) {
-      if (!silent) {
-        alert('Já existe uma barreira ocupando esse espaço.');
-      }
+      if (!silent) alert('Já existe uma barreira ocupando esse espaço.');
       return {
         ok: false,
         baseRow,
@@ -428,7 +439,7 @@ export default function BloqueioPage() {
       };
     }
 
-    // 2) não pode cruzar outra barreira em X (horizontal x vertical no mesmo bloco 2x2)
+    // 2) não pode cruzar outra barreira em X no mesmo bloco 2x2
     const crossesExisting = barriers.some(
       (b) =>
         b.row === baseRow &&
@@ -436,9 +447,8 @@ export default function BloqueioPage() {
         b.orientation !== orientation,
     );
     if (crossesExisting) {
-      if (!silent) {
+      if (!silent)
         alert('Não é permitido cruzar barreiras em X no mesmo espaço.');
-      }
       return {
         ok: false,
         baseRow,
@@ -451,17 +461,15 @@ export default function BloqueioPage() {
     const newBlocked = new Set(blockedEdges);
     edgesToAdd.forEach((e) => newBlocked.add(e));
 
-    // 3) ainda tem caminho até o lado objetivo
+    // 3) ainda existe algum caminho até o lado objetivo (pode andar pra trás)
     const allHavePath = players.every((player) =>
       hasPathToGoal(player, newBlocked),
     );
-
     if (!allHavePath) {
-      if (!silent) {
+      if (!silent)
         alert(
-          'Essa barreira cortaria completamente o caminho de pelo menos um jogador. Jogada inválida.',
+          'Essa barreira cortaria completamente o caminho de pelo menos um jogador.',
         );
-      }
       return {
         ok: false,
         baseRow,
@@ -471,19 +479,16 @@ export default function BloqueioPage() {
       };
     }
 
-    // 4) nenhum jogador fica "encurralado para trás":
-    // precisa existir ao menos um movimento que não aumente
-    // a distância até o objetivo
-    const allHaveNonRegressive = players.every((player) =>
-      hasNonRegressiveMove(player, newBlocked, players),
+    // 4) e também existe um caminho "monótono" para cada jogador
+    // (nunca precisa aumentar a distância até o objetivo).
+    const allHaveMonotone = players.every((player) =>
+      hasMonotonePathToGoal(player, newBlocked),
     );
-
-    if (!allHaveNonRegressive) {
-      if (!silent) {
+    if (!allHaveMonotone) {
+      if (!silent)
         alert(
-          'Essa barreira deixaria algum jogador encurralado, só podendo andar para trás. Jogada inválida.',
+          'Essa barreira deixaria algum jogador encurralado, sem caminho que avance em direção ao objetivo.',
         );
-      }
       return {
         ok: false,
         baseRow,
@@ -501,8 +506,6 @@ export default function BloqueioPage() {
       edgesToAdd,
     };
   }
-
-  // ---- handlers de clique ----
 
   function handleCellClick(row: number, col: number) {
     if (winner !== null) return;
@@ -576,7 +579,7 @@ export default function BloqueioPage() {
     setHoveredCell(null);
   }
 
-  // ---- render tabuleiro ----
+  // ---------- Render do tabuleiro ----------
 
   const cells: JSX.Element[] = [];
 
@@ -589,10 +592,10 @@ export default function BloqueioPage() {
         hoveredCell.row === row &&
         hoveredCell.col === col;
 
-      // base de cada jogador é a SEGUNDA linha/coluna (1 e SIZE-2)
       let background = '#020617';
       const borderColor = '#1f2937';
 
+      // bases nas bordas externas (como você ajustou)
       if (row === 0) {
         background = PLAYER_BASE_COLORS[0];
       }
@@ -606,15 +609,13 @@ export default function BloqueioPage() {
         background = PLAYER_BASE_COLORS[1];
       }
 
-      // hover de jogada permitida
+      // hover de jogada válida
       let isAllowedHover = false;
       if (isHovered) {
         if (mode === 'move') {
           isAllowedHover = canMoveTo(row, col);
-        } else if (mode === 'wall') {
-          const result = checkWallPlacement(row, col, {
-            silent: true,
-          });
+        } else {
+          const result = checkWallPlacement(row, col, { silent: true });
           isAllowedHover = result.ok;
         }
       }
@@ -673,7 +674,7 @@ export default function BloqueioPage() {
     }
   }
 
-  // barreiras (reais + ghost/hover)
+  // barreiras (reais + fantasma)
   const barrierOverlays: JSX.Element[] = [];
   const cellPercent = 100 / SIZE;
 
@@ -735,7 +736,7 @@ export default function BloqueioPage() {
     barrierOverlays.push(renderBarrier(b));
   }
 
-  // barreira fantasma de hover no modo wall
+  // barreira fantasma (hover)
   let ghostBarrier: JSX.Element | null = null;
   if (mode === 'wall' && hoveredCell) {
     const res = checkWallPlacement(hoveredCell.row, hoveredCell.col, {
@@ -757,7 +758,9 @@ export default function BloqueioPage() {
       const p = players.find((pl) => pl.id === winner)!;
       return `${p.name} venceu!`;
     }
-    return `Vez de ${currentPlayer.label} (${mode === 'move' ? 'mover peão' : 'colocar barreira'})`;
+    return `Vez de ${currentPlayer.label} (${
+      mode === 'move' ? 'mover peão' : 'colocar barreira'
+    })`;
   })();
 
   return (
@@ -820,7 +823,7 @@ export default function BloqueioPage() {
             alignItems: 'flex-start',
           }}
         >
-          {/* Tabuleiro com coordenadas */}
+          {/* Tabuleiro + coordenadas */}
           <div
             style={{
               position: 'relative',
@@ -859,7 +862,7 @@ export default function BloqueioPage() {
               {barrierOverlays}
               {ghostBarrier}
 
-              {/* Colunas A–I (cima e baixo) posicionadas no tabuleiro interno (colunas 1..SIZE-2) */}
+              {/* Colunas A–I (cima/baixo) mapeadas para colunas internas 1..SIZE-2 */}
               {COL_LABELS.map((label, idx) => {
                 const colIndex = idx + 1; // interno
                 const left = ((colIndex + 0.5) * 100) / SIZE;
@@ -899,7 +902,7 @@ export default function BloqueioPage() {
                 );
               })}
 
-              {/* Linhas 1–9 (esquerda e direita) no tabuleiro interno (linhas 1..SIZE-2) */}
+              {/* Linhas 1–9 (esquerda/direita) mapeadas para linhas internas 1..SIZE-2 */}
               {ROW_LABELS.map((label, idx) => {
                 const rowIndex = idx + 1;
                 const top = ((rowIndex + 0.5) * 100) / SIZE;
@@ -1058,59 +1061,57 @@ export default function BloqueioPage() {
               </div>
 
               {mode === 'wall' && (
-                <>
-                  <div
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                    flexWrap: 'wrap',
+                    marginBottom: '0.5rem',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setWallOrientation('H')}
                     style={{
-                      display: 'flex',
-                      gap: '0.5rem',
-                      flexWrap: 'wrap',
-                      marginBottom: '0.5rem',
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: 999,
+                      border:
+                        wallOrientation === 'H'
+                          ? '2px solid #facc15'
+                          : '1px solid #1f2937',
+                      background:
+                        wallOrientation === 'H'
+                          ? 'rgba(250,204,21,0.15)'
+                          : 'rgba(15,23,42,1)',
+                      color: '#e5e7eb',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setWallOrientation('H')}
-                      style={{
-                        padding: '0.35rem 0.75rem',
-                        borderRadius: 999,
-                        border:
-                          wallOrientation === 'H'
-                            ? '2px solid #facc15'
-                            : '1px solid #1f2937',
-                        background:
-                          wallOrientation === 'H'
-                            ? 'rgba(250,204,21,0.15)'
-                            : 'rgba(15,23,42,1)',
-                        color: '#e5e7eb',
-                        fontSize: '0.8rem',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Barreira horizontal
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setWallOrientation('V')}
-                      style={{
-                        padding: '0.35rem 0.75rem',
-                        borderRadius: 999,
-                        border:
-                          wallOrientation === 'V'
-                            ? '2px solid #facc15'
-                            : '1px solid #1f2937',
-                        background:
-                          wallOrientation === 'V'
-                            ? 'rgba(250,204,21,0.15)'
-                            : 'rgba(15,23,42,1)',
-                        color: '#e5e7eb',
-                        fontSize: '0.8rem',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Barreira vertical
-                    </button>
-                  </div>
-                </>
+                    Barreira horizontal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWallOrientation('V')}
+                    style={{
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: 999,
+                      border:
+                        wallOrientation === 'V'
+                          ? '2px solid #facc15'
+                          : '1px solid #1f2937',
+                      background:
+                        wallOrientation === 'V'
+                          ? 'rgba(250,204,21,0.15)'
+                          : 'rgba(15,23,42,1)',
+                      color: '#e5e7eb',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Barreira vertical
+                  </button>
+                </div>
               )}
             </div>
 
