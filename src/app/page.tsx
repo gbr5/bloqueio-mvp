@@ -124,21 +124,7 @@ function createInitialPlayers(): Player[] {
   ];
 }
 
-// distância "em linha reta" até o lado objetivo (ignorando barreiras)
-function goalDistance(player: Player, row: number, col: number): number {
-  switch (player.goalSide) {
-    case 'TOP':
-      return row;
-    case 'BOTTOM':
-      return (SIZE - 1) - row;
-    case 'LEFT':
-      return col;
-    case 'RIGHT':
-      return (SIZE - 1) - col;
-  }
-}
-
-// BFS para checar se ainda existe algum caminho (pode andar pra trás)
+// BFS para checar se ainda existe algum caminho até o objetivo
 function hasPathToGoal(
   player: Player,
   blockedEdges: Set<string>,
@@ -171,51 +157,6 @@ function hasPathToGoal(
       queue.push({ row: nr, col: nc });
     }
   }
-  return false;
-}
-
-// BFS "monótono": só anda por casas cuja distância ao objetivo
-// NUNCA aumenta. Garante que sempre exista um caminho que nunca
-// obriga o jogador a andar pra trás em relação ao objetivo.
-function hasMonotonePathToGoal(
-  player: Player,
-  blockedEdges: Set<string>,
-): boolean {
-  const visited = Array.from({ length: SIZE }, () =>
-    Array(SIZE).fill(false),
-  );
-  const queue: Cell[] = [{ row: player.row, col: player.col }];
-  visited[player.row][player.col] = true;
-
-  const directions = [
-    { dr: -1, dc: 0 },
-    { dr: 1, dc: 0 },
-    { dr: 0, dc: -1 },
-    { dr: 0, dc: 1 },
-  ];
-
-  while (queue.length > 0) {
-    const { row, col } = queue.shift() as Cell;
-    if (isGoal(row, col, player.goalSide)) return true;
-
-    const distHere = goalDistance(player, row, col);
-
-    for (const { dr, dc } of directions) {
-      const nr = row + dr;
-      const nc = col + dc;
-      if (!isInside(nr, nc)) continue;
-      if (blockedEdges.has(edgeKey(row, col, nr, nc))) continue;
-
-      const distNext = goalDistance(player, nr, nc);
-      // não pode piorar a distância em relação à casa atual
-      if (distNext > distHere) continue;
-      if (visited[nr][nc]) continue;
-
-      visited[nr][nc] = true;
-      queue.push({ row: nr, col: nc });
-    }
-  }
-
   return false;
 }
 
@@ -388,8 +329,8 @@ export default function BloqueioPage() {
 
     // Barreiras podem encostar na faixa colorida,
     // então baseRow/baseCol vão de 0 até SIZE-2.
-    const baseRow = Math.max(1, Math.min(clickRow, SIZE - 2));
-    const baseCol = Math.max(1, Math.min(clickCol, SIZE - 2));
+    const baseRow = Math.max(0, Math.min(clickRow, SIZE - 2));
+    const baseCol = Math.max(0, Math.min(clickCol, SIZE - 2));
 
     const edgesToAdd: string[] = [];
     const orientation = wallOrientation;
@@ -469,25 +410,6 @@ export default function BloqueioPage() {
       if (!silent)
         alert(
           'Essa barreira cortaria completamente o caminho de pelo menos um jogador.',
-        );
-      return {
-        ok: false,
-        baseRow,
-        baseCol,
-        orientation,
-        edgesToAdd,
-      };
-    }
-
-    // 4) e também existe um caminho "monótono" para cada jogador
-    // (nunca precisa aumentar a distância até o objetivo).
-    const allHaveMonotone = players.every((player) =>
-      hasMonotonePathToGoal(player, newBlocked),
-    );
-    if (!allHaveMonotone) {
-      if (!silent)
-        alert(
-          'Essa barreira deixaria algum jogador encurralado, sem caminho que avance em direção ao objetivo.',
         );
       return {
         ok: false,
