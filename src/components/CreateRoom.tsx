@@ -11,6 +11,19 @@
 "use client";
 
 import { useState } from "react";
+import { createGameRoom } from "@/lib/actions/game-room";
+import type { GameSnapshot } from "@/types/game";
+
+// Helper to create initial game state (empty lobby)
+function createInitialGameState(): GameSnapshot {
+  return {
+    players: [],
+    blockedEdges: [],
+    barriers: [],
+    currentPlayerId: 0,
+    winner: null,
+  };
+}
 
 interface CreateRoomProps {
   onRoomCreated: (roomCode: string) => void;
@@ -20,22 +33,26 @@ interface CreateRoomProps {
 export function CreateRoom({ onRoomCreated, onCancel }: CreateRoomProps) {
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleCreateRoom = async () => {
-    setCreating(true);
+    setLoading(true);
     setError(null);
 
     try {
-      // This will be filled in when we integrate with useGameRoom
-      // For now, just simulate room creation
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const mockCode = generateMockCode();
-      setRoomCode(mockCode);
+      const initialState = createInitialGameState();
+      const result = await createGameRoom(initialState);
+      
+      if (result.error) {
+        setError(result.error);
+      } else if (result.roomCode) {
+        setRoomCode(result.roomCode);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create room");
-      setCreating(false);
+      setError(err instanceof Error ? err.message : 'Failed to create room');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -55,16 +72,6 @@ export function CreateRoom({ onRoomCreated, onCancel }: CreateRoomProps) {
     if (roomCode) {
       onRoomCreated(roomCode);
     }
-  };
-
-  // Mock code generator (will be replaced with real one from hook)
-  const generateMockCode = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let code = "";
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
   };
 
   return (
@@ -90,15 +97,15 @@ export function CreateRoom({ onRoomCreated, onCancel }: CreateRoomProps) {
             <div className="space-y-4">
               <button
                 onClick={handleCreateRoom}
-                disabled={creating}
+                disabled={loading}
                 className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200 shadow-lg"
               >
-                {creating ? "Creating Room..." : "Create Room"}
+                {loading ? "Creating Room..." : "Create Room"}
               </button>
 
               <button
                 onClick={onCancel}
-                disabled={creating}
+                disabled={loading}
                 className="w-full py-3 px-6 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors duration-200"
               >
                 Cancel
