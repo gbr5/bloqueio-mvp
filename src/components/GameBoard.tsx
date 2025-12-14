@@ -84,8 +84,7 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
 
   // For now, just render the local game (Task 2)
   // Turn validation and move sync will be Task 4 & 5
-  const isMyTurn =
-    myPlayerId !== null && gameState.currentPlayerId === myPlayerId;
+  const isMyTurn = myPlayerId !== null && gameState.currentPlayerId === myPlayerId;
 
   return (
     <div className="relative">
