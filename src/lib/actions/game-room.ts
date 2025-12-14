@@ -36,9 +36,15 @@ export async function createGameRoom(
     console.log("🔑 Generated room code:", roomCode);
 
     const result = await sql`
-      INSERT INTO game_rooms (room_code, status, game_state)
-      VALUES (${roomCode}, 'waiting', ${JSON.stringify(initialState)})
-      RETURNING room_code
+      INSERT INTO game_rooms (id, status, host_player_id, current_player_id, game_state)
+      VALUES (
+        ${roomCode}, 
+        'waiting', 
+        0, 
+        ${initialState.currentPlayerId}, 
+        ${JSON.stringify(initialState)}
+      )
+      RETURNING id
     `;
 
     console.log("✅ Room created successfully:", result);
@@ -58,7 +64,7 @@ export async function loadGameRoom(
   try {
     const result = await sql<GameRoom[]>`
       SELECT * FROM game_rooms
-      WHERE room_code = ${roomCode}
+      WHERE id = ${roomCode}
       LIMIT 1
     `;
 
@@ -86,8 +92,9 @@ export async function updateGameRoom(
       UPDATE game_rooms
       SET 
         game_state = ${JSON.stringify(gameState)},
+        current_player_id = ${gameState.currentPlayerId},
         status = COALESCE(${status}, status)
-      WHERE room_code = ${roomCode}
+      WHERE id = ${roomCode}
     `;
 
     return { success: true };
