@@ -11,54 +11,79 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { loadGameRoom } from "@/lib/actions/game-room";
 import type { GameRoom } from "@/types/game";
+import { PLAYER_BASE_COLORS } from "@/types/game";
 
 interface WaitingLobbyProps {
   roomCode: string;
   isHost: boolean;
-  onStartGame: () => void;
-  onLeave: () => void;
-}
-
-// Mock player data - will be replaced with real data from GameRoom
-interface MockPlayer {
-  id: number;
-  name: string;
-  color: string;
-  isHost?: boolean;
+  initialRoom: GameRoom;
 }
 
 export function WaitingLobby({
   roomCode,
   isHost,
-  onStartGame,
-  onLeave,
+  initialRoom,
 }: WaitingLobbyProps) {
-  const [players, setPlayers] = useState<MockPlayer[]>([
-    { id: 0, name: "Player 1 (You)", color: "#ef4444", isHost: true },
-  ]);
+  const router = useRouter();
+  const [room, setRoom] = useState<GameRoom>(initialRoom);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Polling logic - will be replaced with real hook call
+  // Poll for room updates every 2 seconds
   useEffect(() => {
-    const pollInterval = setInterval(() => {
-      // TODO: Replace with real useGameRoom.loadRoom(roomCode)
-      console.log("Polling for room updates...");
+    const pollInterval = setInterval(async () => {
+      try {
+        const result = await loadGameRoom(roomCode);
+        if (result.room) {
+          setRoom(result.room);
 
-      // Mock: simulate player joining after 5 seconds
-      if (players.length === 1) {
-        setTimeout(() => {
-          setPlayers((prev) => [
-            ...prev,
-            { id: 1, name: "Player 2", color: "#3b82f6" },
-          ]);
-        }, 5000);
+          // If game started, navigate to game page
+          if (result.room.status === "playing") {
+            router.push(`/room/${roomCode}/game`);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to poll room:", error);
       }
     }, 2000);
 
     return () => clearInterval(pollInterval);
-  }, [roomCode, players.length]);
+  }, [roomCode, router]);
+
+  // Loading state - show spinner while room loads
+  if (loading || !room) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-slate-400">Loading lobby...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">Failed to load room</p>
+          <button
+            onClick={() => router.push("/")}
+            className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+          >
+            Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const players = room.game_state.players;
+  const playerCount = players.length;
 
   const handleCopyCode = async () => {
     try {
@@ -71,15 +96,20 @@ export function WaitingLobby({
   };
 
   const handleStartGame = () => {
-    if (players.length < 2) {
+    if (playerCount < 2) {
       alert("Need at least 2 players to start");
       return;
     }
     setLoading(true);
-    onStartGame();
+    // TODO: Update room status to 'playing'
+    router.push(`/room/${roomCode}/game`);
   };
 
-  const canStart = isHost && players.length >= 2 && players.length <= 4;
+  const handleLeave = () => {
+    router.push("/");
+  };
+
+  const canStart = isHost && playerCount >= 2 && playerCount <= 4;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
@@ -132,7 +162,7 @@ export function WaitingLobby({
                 </span>
 
                 {/* Host badge */}
-                {player.isHost && (
+                {player.id === room.hostPlayerId && (
                   <span className="px-2 py-1 bg-yellow-600 text-xs font-semibold rounded text-white">
                     HOST
                   </span>
@@ -189,7 +219,7 @@ export function WaitingLobby({
           )}
 
           <button
-            onClick={onLeave}
+            onClick={handleLeave}
             disabled={loading}
             className="w-full py-3 px-6 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg transition-colors duration-200"
           >

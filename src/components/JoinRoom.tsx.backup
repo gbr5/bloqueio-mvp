@@ -10,16 +10,14 @@
 
 "use client";
 
-import { useState, useRef, KeyboardEvent } from "react";
-import { useRouter } from "next/navigation";
-import { loadGameRoom } from "@/lib/actions/game-room";
+import { useState, useRef, ChangeEvent, KeyboardEvent } from "react";
 
 interface JoinRoomProps {
+  onRoomJoined: (roomCode: string) => void;
   onCancel: () => void;
 }
 
-export function JoinRoom({ onCancel }: JoinRoomProps) {
-  const router = useRouter();
+export function JoinRoom({ onRoomJoined, onCancel }: JoinRoomProps) {
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,15 +74,16 @@ export function JoinRoom({ onCancel }: JoinRoomProps) {
     setError(null);
 
     try {
-      // Verify room exists in database
-      const result = await loadGameRoom(roomCode);
+      // This will be filled in when we integrate with useGameRoom
+      // For now, just simulate room lookup
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      if (result.error || !result.room) {
+      // Mock validation - will be replaced with real DB lookup
+      if (roomCode === "INVALID") {
         throw new Error("Room not found");
       }
 
-      // Navigate to lobby with isHost=false query param
-      router.push(`/room/${roomCode}/lobby?isHost=false`);
+      onRoomJoined(roomCode);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join room");
       setJoining(false);

@@ -15,14 +15,14 @@
 
 - [x] Open http://localhost:3000
 - [x] Verify HomeScreen displays with 3 buttons
-- [ ] Click "Create New Game" → Should navigate to CreateRoom
-- [ ] Go back, click "Join Game" → Should navigate to JoinRoom
+- [x] Click "Create New Game" → Should navigate to CreateRoom
+- [x] Go back, click "Join Game" → Should navigate to JoinRoom
 - [ ] Go back, click "Play Offline" → Should navigate to placeholder game screen
 
 ### 2. Create Room Flow
 
-- [ ] Click "Create New Game"
-- [ ] Click "Create Room" button
+- [x] Click "Create New Game"
+- [] Click "Create Room" button
 - [ ] Verify loading state shows "Creating Room..."
 - [ ] **Check server logs** for:
   ```
@@ -99,6 +99,7 @@ After creating a room:
 ## Issues Found
 
 ### Issue #1: Database Schema Mismatch ✅ FIXED
+
 - **Found:** 1:22 PM
 - **Fixed:** 1:22 PM (5 minutes)
 - **Problem:** Server Actions used `room_code` column, but schema has `id` column
@@ -121,9 +122,27 @@ After creating a room:
 ## Test Results
 
 ### Round 1: Initial Test (1:15 PM - 1:22 PM)
+
 - ❌ Room creation failed with schema error
 - ✅ Error logging worked perfectly
 - ✅ Fix applied in 5 minutes
 
-### Round 2: After Schema Fix (1:22 PM - ongoing)
-_Waiting for test results..._
+### Round 2: After Schema Fix (1:22 PM - 1:30 PM)
+
+- ✅ Room creation successful!
+- ✅ Room code generated and displayed
+- ✅ Join flow works (anonymous tab)
+- ❌ **BUG: Player duplication** - Second player added 3 times
+- ❌ **BUG: Room full prematurely** - 4 slots filled with only 2 real players
+- ⚠️ **Missing: Player slot management** - Need to assign unique player IDs
+
+### Issue #2: Player Duplication in Polling ⏱️ FIXING NOW
+
+- **Found:** 1:30 PM
+- **Problem:** Mock polling in WaitingLobby adds duplicate players
+- **Root Cause:** No real player management, no player ID assignment
+- **Solution Needed:**
+  - Implement proper player joining logic
+  - Assign unique player IDs (0-3) when joining
+  - Track which browser/user owns which player
+  - Real polling from database instead of mock data
