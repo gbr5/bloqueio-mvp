@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { loadGameRoom } from "@/lib/actions/game-room";
+import { loadGameRoom, startGame } from "@/lib/actions/game-room";
 import type { GameRoom } from "@/types/game";
 
 interface WaitingLobbyProps {
@@ -77,14 +77,32 @@ export function WaitingLobby({
     }
   };
 
-  const handleStartGame = () => {
+  const handleStartGame = async () => {
     if (playerCount < 2) {
       alert("Need at least 2 players to start");
       return;
     }
+    
     setLoading(true);
-    // TODO: Update room status to 'playing'
-    router.push(`/room/${roomCode}/game`);
+    
+    try {
+      const result = await startGame(roomCode);
+      
+      if (result.error) {
+        alert(result.error);
+        setLoading(false);
+        return;
+      }
+      
+      console.log("✅ [WaitingLobby] Game started, navigating to game board");
+      
+      // Navigate to game board
+      router.push(`/room/${roomCode}/game`);
+    } catch (error) {
+      console.error("Failed to start game:", error);
+      alert("Failed to start game");
+      setLoading(false);
+    }
   };
 
   const handleLeave = () => {
