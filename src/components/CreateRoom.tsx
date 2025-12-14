@@ -43,14 +43,14 @@ export function CreateRoom({ onRoomCreated, onCancel }: CreateRoomProps) {
     try {
       const initialState = createInitialGameState();
       const result = await createGameRoom(initialState);
-      
+
       if (result.error) {
         setError(result.error);
       } else if (result.roomCode) {
         setRoomCode(result.roomCode);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create room');
+      setError(err instanceof Error ? err.message : "Failed to create room");
     } finally {
       setLoading(false);
     }

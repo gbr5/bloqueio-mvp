@@ -2,4 +2,4 @@
 // Replace: export default function BloqueioPage() {
 // With: export { default } from './router';
 
-export { default } from './router';
+export { default } from "./router";

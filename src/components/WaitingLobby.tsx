@@ -1,6 +1,6 @@
 /**
  * WaitingLobby Component
- * 
+ *
  * Displays room information and players:
  * - Polls database every 2 seconds for updates
  * - Shows room code and player list
@@ -8,10 +8,10 @@
  * - All players can leave room
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import type { GameRoom } from '@/types/game';
+import { useState, useEffect } from "react";
+import type { GameRoom } from "@/types/game";
 
 interface WaitingLobbyProps {
   roomCode: string;
@@ -28,9 +28,14 @@ interface MockPlayer {
   isHost?: boolean;
 }
 
-export function WaitingLobby({ roomCode, isHost, onStartGame, onLeave }: WaitingLobbyProps) {
+export function WaitingLobby({
+  roomCode,
+  isHost,
+  onStartGame,
+  onLeave,
+}: WaitingLobbyProps) {
   const [players, setPlayers] = useState<MockPlayer[]>([
-    { id: 0, name: 'Player 1 (You)', color: '#ef4444', isHost: true }
+    { id: 0, name: "Player 1 (You)", color: "#ef4444", isHost: true },
   ]);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -39,14 +44,14 @@ export function WaitingLobby({ roomCode, isHost, onStartGame, onLeave }: Waiting
   useEffect(() => {
     const pollInterval = setInterval(() => {
       // TODO: Replace with real useGameRoom.loadRoom(roomCode)
-      console.log('Polling for room updates...');
-      
+      console.log("Polling for room updates...");
+
       // Mock: simulate player joining after 5 seconds
       if (players.length === 1) {
         setTimeout(() => {
-          setPlayers(prev => [
+          setPlayers((prev) => [
             ...prev,
-            { id: 1, name: 'Player 2', color: '#3b82f6' }
+            { id: 1, name: "Player 2", color: "#3b82f6" },
           ]);
         }, 5000);
       }
@@ -61,13 +66,13 @@ export function WaitingLobby({ roomCode, isHost, onStartGame, onLeave }: Waiting
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      console.error("Failed to copy:", err);
     }
   };
 
   const handleStartGame = () => {
     if (players.length < 2) {
-      alert('Need at least 2 players to start');
+      alert("Need at least 2 players to start");
       return;
     }
     setLoading(true);
@@ -95,7 +100,7 @@ export function WaitingLobby({ roomCode, isHost, onStartGame, onLeave }: Waiting
                 onClick={handleCopyCode}
                 className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors text-sm"
               >
-                {copied ? '✓ Copied' : '📋 Copy'}
+                {copied ? "✓ Copied" : "📋 Copy"}
               </button>
             </div>
             <p className="text-slate-500 text-sm mt-2">
@@ -120,7 +125,7 @@ export function WaitingLobby({ roomCode, isHost, onStartGame, onLeave }: Waiting
                   className="w-8 h-8 rounded-full border-2 border-white"
                   style={{ backgroundColor: player.color }}
                 />
-                
+
                 {/* Player name */}
                 <span className="text-white font-medium flex-1">
                   {player.name}
@@ -142,7 +147,9 @@ export function WaitingLobby({ roomCode, isHost, onStartGame, onLeave }: Waiting
                 className="flex items-center gap-3 p-3 bg-slate-900/20 rounded-lg border border-dashed border-slate-700"
               >
                 <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700" />
-                <span className="text-slate-600 italic">Waiting for player...</span>
+                <span className="text-slate-600 italic">
+                  Waiting for player...
+                </span>
               </div>
             ))}
           </div>
@@ -151,9 +158,11 @@ export function WaitingLobby({ roomCode, isHost, onStartGame, onLeave }: Waiting
         {/* Game Info */}
         <div className="bg-blue-900/20 border border-blue-800 rounded-lg p-4 mb-6">
           <p className="text-blue-200 text-sm text-center">
-            {players.length < 2 && 'Waiting for at least 2 players to start...'}
-            {players.length >= 2 && players.length < 4 && 'Ready to start! More players can join until game begins.'}
-            {players.length === 4 && 'Room is full! Ready to start.'}
+            {players.length < 2 && "Waiting for at least 2 players to start..."}
+            {players.length >= 2 &&
+              players.length < 4 &&
+              "Ready to start! More players can join until game begins."}
+            {players.length === 4 && "Room is full! Ready to start."}
           </p>
         </div>
 
@@ -165,7 +174,11 @@ export function WaitingLobby({ roomCode, isHost, onStartGame, onLeave }: Waiting
               disabled={!canStart || loading}
               className="w-full py-4 px-6 bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200 shadow-lg"
             >
-              {loading ? 'Starting...' : canStart ? 'Start Game' : 'Waiting for players...'}
+              {loading
+                ? "Starting..."
+                : canStart
+                ? "Start Game"
+                : "Waiting for players..."}
             </button>
           )}
 
