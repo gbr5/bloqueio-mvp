@@ -249,3 +249,48 @@ export async function joinGameRoom(
     return { error: "Failed to join room" };
   }
 }
+
+/**
+ * Start a game (change room status to 'playing')
+ */
+export async function startGame(
+  roomCode: string
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    // Load current room to get game state
+    const result = await loadGameRoom(roomCode);
+
+    if (result.error || !result.room) {
+      return { error: "Room not found" };
+    }
+
+    const room = result.room;
+
+    // Validate can start
+    if (room.game_state.players.length < 2) {
+      return { error: "Need at least 2 players to start" };
+    }
+
+    if (room.status === "playing" || room.status === "finished") {
+      return { error: "Game already started" };
+    }
+
+    // Update room status to 'playing'
+    const updateResult = await updateGameRoom(
+      roomCode,
+      room.game_state,
+      "playing"
+    );
+
+    if (updateResult.error) {
+      return { error: updateResult.error };
+    }
+
+    console.log("🎮 [startGame] Game started for room", roomCode);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to start game:", error);
+    return { error: "Failed to start game" };
+  }
+}
