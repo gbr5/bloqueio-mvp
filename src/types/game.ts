@@ -1,6 +1,6 @@
 /**
  * Bloqueio Game Type Definitions
- * 
+ *
  * This file contains all TypeScript type definitions for the game.
  * Extracted from the monolithic page.tsx for better maintainability.
  */
@@ -13,13 +13,13 @@
 export type PlayerId = 0 | 1 | 2 | 3;
 
 /** Goal sides - which border edge each player must reach to win */
-export type GoalSide = 'TOP' | 'RIGHT' | 'BOTTOM' | 'LEFT';
+export type GoalSide = "TOP" | "RIGHT" | "BOTTOM" | "LEFT";
 
 /** Game mode - either moving pawns or placing barriers */
-export type Mode = 'move' | 'wall';
+export type Mode = "move" | "wall";
 
 /** Barrier orientation - horizontal or vertical */
-export type Orientation = 'H' | 'V';
+export type Orientation = "H" | "V";
 
 // ============================================================================
 // Player
@@ -91,7 +91,7 @@ export interface GameSnapshot {
 // ============================================================================
 
 /** Game room status */
-export type RoomStatus = 'waiting' | 'playing' | 'finished';
+export type RoomStatus = "waiting" | "playing" | "finished";
 
 export interface GameRoom {
   /** 6-digit room code */
@@ -116,26 +116,26 @@ export interface GameRoom {
 
 /** Player base colors (semi-transparent for board overlay) */
 export const PLAYER_BASE_COLORS: Record<PlayerId, string> = {
-  0: 'rgba(239,68,68,0.24)', // red
-  1: 'rgba(59,130,246,0.24)', // blue
-  2: 'rgba(34,197,94,0.24)', // green
-  3: 'rgba(245,158,11,0.24)', // yellow
+  0: "rgba(239,68,68,0.24)", // red
+  1: "rgba(59,130,246,0.24)", // blue
+  2: "rgba(34,197,94,0.24)", // green
+  3: "rgba(245,158,11,0.24)", // yellow
 };
 
 /** Player solid colors */
 export const PLAYER_COLORS: Record<PlayerId, string> = {
-  0: '#ef4444', // red
-  1: '#3b82f6', // blue
-  2: '#22c55e', // green
-  3: '#f59e0b', // yellow
+  0: "#ef4444", // red
+  1: "#3b82f6", // blue
+  2: "#22c55e", // green
+  3: "#f59e0b", // yellow
 };
 
 /** Player labels */
 export const PLAYER_LABELS: Record<PlayerId, string> = {
-  0: 'P1',
-  1: 'P2',
-  2: 'P3',
-  3: 'P4',
+  0: "P1",
+  1: "P2",
+  2: "P3",
+  3: "P4",
 };
 
 // ============================================================================
@@ -149,5 +149,5 @@ export function isPlayerId(id: number): id is PlayerId {
 
 /** Type guard to check if a value is a valid Orientation */
 export function isOrientation(value: string): value is Orientation {
-  return value === 'H' || value === 'V';
+  return value === "H" || value === "V";
 }

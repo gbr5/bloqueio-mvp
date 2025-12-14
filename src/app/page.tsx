@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { JSX, useState } from 'react';
+import { JSX, useState } from "react";
 import type {
   PlayerId,
   GoalSide,
@@ -10,17 +10,15 @@ import type {
   Orientation,
   Barrier,
   GameSnapshot,
-} from '@/types/game';
-import { PLAYER_BASE_COLORS } from '@/types/game';
+} from "@/types/game";
+import { PLAYER_BASE_COLORS } from "@/types/game";
 
 // Tabuleiro original interno é 9x9, com uma borda extra em volta
 const INNER_SIZE = 9;
 const SIZE = INNER_SIZE + 2; // 11x11 com bordas
 
-const COL_LABELS = 'ABCDEFGHI'.split('');
-const ROW_LABELS = Array.from({ length: INNER_SIZE }, (_, i) =>
-  String(i + 1),
-);
+const COL_LABELS = "ABCDEFGHI".split("");
+const ROW_LABELS = Array.from({ length: INNER_SIZE }, (_, i) => String(i + 1));
 
 function edgeKey(r1: number, c1: number, r2: number, c2: number) {
   if (r1 > r2 || (r1 === r2 && c1 > c2)) {
@@ -37,13 +35,13 @@ function isInside(row: number, col: number) {
 // Objetivo é alcançar a BORDA externa (0 ou SIZE-1)
 function isGoal(row: number, col: number, goalSide: GoalSide) {
   switch (goalSide) {
-    case 'TOP':
+    case "TOP":
       return row === 0;
-    case 'BOTTOM':
+    case "BOTTOM":
       return row === SIZE - 1;
-    case 'LEFT':
+    case "LEFT":
       return col === 0;
-    case 'RIGHT':
+    case "RIGHT":
       return col === SIZE - 1;
   }
 }
@@ -55,53 +53,48 @@ function createInitialPlayers(): Player[] {
       id: 0,
       row: 1, // segunda linha a partir do topo
       col: mid,
-      goalSide: 'BOTTOM',
+      goalSide: "BOTTOM",
       wallsLeft: 6,
-      color: '#ef4444',
-      name: 'Jogador 1',
-      label: 'Vermelho',
+      color: "#ef4444",
+      name: "Jogador 1",
+      label: "Vermelho",
     },
     {
       id: 1,
       row: mid,
       col: SIZE - 2, // segunda coluna a partir da direita
-      goalSide: 'LEFT',
+      goalSide: "LEFT",
       wallsLeft: 6,
-      color: '#3b82f6',
-      name: 'Jogador 2',
-      label: 'Azul',
+      color: "#3b82f6",
+      name: "Jogador 2",
+      label: "Azul",
     },
     {
       id: 2,
       row: SIZE - 2, // segunda linha a partir de baixo
       col: mid,
-      goalSide: 'TOP',
+      goalSide: "TOP",
       wallsLeft: 6,
-      color: '#22c55e',
-      name: 'Jogador 3',
-      label: 'Verde',
+      color: "#22c55e",
+      name: "Jogador 3",
+      label: "Verde",
     },
     {
       id: 3,
       row: mid,
       col: 1, // segunda coluna a partir da esquerda
-      goalSide: 'RIGHT',
+      goalSide: "RIGHT",
       wallsLeft: 6,
-      color: '#f59e0b',
-      name: 'Jogador 4',
-      label: 'Amarelo',
+      color: "#f59e0b",
+      name: "Jogador 4",
+      label: "Amarelo",
     },
   ];
 }
 
 // BFS para checar se ainda existe algum caminho até o objetivo
-function hasPathToGoal(
-  player: Player,
-  blockedEdges: Set<string>,
-): boolean {
-  const visited = Array.from({ length: SIZE }, () =>
-    Array(SIZE).fill(false),
-  );
+function hasPathToGoal(player: Player, blockedEdges: Set<string>): boolean {
+  const visited = Array.from({ length: SIZE }, () => Array(SIZE).fill(false));
   const queue: Cell[] = [{ row: player.row, col: player.col }];
   visited[player.row][player.col] = true;
 
@@ -136,7 +129,7 @@ function canPawnMoveTo(
   destRow: number,
   destCol: number,
   blockedEdges: Set<string>,
-  players: Player[],
+  players: Player[]
 ): boolean {
   if (!isInside(destRow, destCol)) return false;
   if (destRow === player.row && destCol === player.col) return false;
@@ -153,7 +146,7 @@ function canPawnMoveTo(
 
   // destino não pode estar ocupado
   const occupied = players.some(
-    (p) => p.id !== player.id && p.row === destRow && p.col === destCol,
+    (p) => p.id !== player.id && p.row === destRow && p.col === destCol
   );
   if (occupied) return false;
 
@@ -172,20 +165,15 @@ function canPawnMoveTo(
   }
 
   // 2) pulo em linha reta (2 casas)
-  const isStraightTwo =
-    (adr === 2 && adc === 0) || (adr === 0 && adc === 2);
+  const isStraightTwo = (adr === 2 && adc === 0) || (adr === 0 && adc === 2);
   if (!isStraightTwo) return false;
 
-  const midRow =
-    player.row + (dr === 0 ? 0 : dr > 0 ? 1 : -1);
-  const midCol =
-    player.col + (dc === 0 ? 0 : dc > 0 ? 1 : -1);
+  const midRow = player.row + (dr === 0 ? 0 : dr > 0 ? 1 : -1);
+  const midCol = player.col + (dc === 0 ? 0 : dc > 0 ? 1 : -1);
 
   if (!isInside(midRow, midCol)) return false;
 
-  const middlePawn = players.find(
-    (p) => p.row === midRow && p.col === midCol,
-  );
+  const middlePawn = players.find((p) => p.row === midRow && p.col === midCol);
   if (!middlePawn) return false;
 
   if (
@@ -200,18 +188,17 @@ function canPawnMoveTo(
 
 export default function BloqueioPage() {
   const [players, setPlayers] = useState<Player[]>(() =>
-    createInitialPlayers(),
+    createInitialPlayers()
   );
   const [blockedEdges, setBlockedEdges] = useState<Set<string>>(
-    () => new Set(),
+    () => new Set()
   );
   const [barriers, setBarriers] = useState<Barrier[]>([]);
   const [currentPlayerId, setCurrentPlayerId] = useState<PlayerId>(0);
-  const [mode, setMode] = useState<Mode>('move');
+  const [mode, setMode] = useState<Mode>("move");
   const [winner, setWinner] = useState<PlayerId | null>(null);
   const [history, setHistory] = useState<GameSnapshot[]>([]);
-  const [wallOrientation, setWallOrientation] =
-    useState<Orientation>('H');
+  const [wallOrientation, setWallOrientation] = useState<Orientation>("H");
   const [hoveredCell, setHoveredCell] = useState<Cell | null>(null);
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId)!;
@@ -248,7 +235,7 @@ export default function BloqueioPage() {
       setBarriers(last.barriers.map((b) => ({ ...b })));
       setCurrentPlayerId(last.currentPlayerId);
       setWinner(last.winner);
-      setMode('move');
+      setMode("move");
       setHoveredCell(null);
 
       return prev.slice(0, -1);
@@ -272,7 +259,7 @@ export default function BloqueioPage() {
   function checkWallPlacement(
     clickRow: number,
     clickCol: number,
-    opts?: { silent?: boolean },
+    opts?: { silent?: boolean }
   ): WallCheckResult {
     const silent = opts?.silent ?? false;
 
@@ -287,7 +274,7 @@ export default function BloqueioPage() {
     }
 
     if (currentPlayer.wallsLeft <= 0) {
-      if (!silent) alert('Você não tem mais barreiras disponíveis.');
+      if (!silent) alert("Você não tem mais barreiras disponíveis.");
       return {
         ok: false,
         baseRow: 0,
@@ -305,7 +292,7 @@ export default function BloqueioPage() {
     const edgesToAdd: string[] = [];
     const orientation = wallOrientation;
 
-    if (orientation === 'H') {
+    if (orientation === "H") {
       // barreira horizontal entre baseRow e baseRow+1, cobrindo duas colunas
       if (baseRow + 1 >= SIZE || baseCol + 1 >= SIZE) {
         return {
@@ -317,9 +304,7 @@ export default function BloqueioPage() {
         };
       }
       edgesToAdd.push(edgeKey(baseRow, baseCol, baseRow + 1, baseCol));
-      edgesToAdd.push(
-        edgeKey(baseRow, baseCol + 1, baseRow + 1, baseCol + 1),
-      );
+      edgesToAdd.push(edgeKey(baseRow, baseCol + 1, baseRow + 1, baseCol + 1));
     } else {
       // barreira vertical entre baseCol e baseCol+1, cobrindo duas linhas
       if (baseRow + 1 >= SIZE || baseCol + 1 >= SIZE) {
@@ -332,15 +317,13 @@ export default function BloqueioPage() {
         };
       }
       edgesToAdd.push(edgeKey(baseRow, baseCol, baseRow, baseCol + 1));
-      edgesToAdd.push(
-        edgeKey(baseRow + 1, baseCol, baseRow + 1, baseCol + 1),
-      );
+      edgesToAdd.push(edgeKey(baseRow + 1, baseCol, baseRow + 1, baseCol + 1));
     }
 
     // 1) não pode reutilizar arestas
     const anyAlreadyBlocked = edgesToAdd.some((e) => blockedEdges.has(e));
     if (anyAlreadyBlocked) {
-      if (!silent) alert('Já existe uma barreira ocupando esse espaço.');
+      if (!silent) alert("Já existe uma barreira ocupando esse espaço.");
       return {
         ok: false,
         baseRow,
@@ -353,13 +336,11 @@ export default function BloqueioPage() {
     // 2) não pode cruzar outra barreira em X no mesmo bloco 2x2
     const crossesExisting = barriers.some(
       (b) =>
-        b.row === baseRow &&
-        b.col === baseCol &&
-        b.orientation !== orientation,
+        b.row === baseRow && b.col === baseCol && b.orientation !== orientation
     );
     if (crossesExisting) {
       if (!silent)
-        alert('Não é permitido cruzar barreiras em X no mesmo espaço.');
+        alert("Não é permitido cruzar barreiras em X no mesmo espaço.");
       return {
         ok: false,
         baseRow,
@@ -374,12 +355,12 @@ export default function BloqueioPage() {
 
     // 3) ainda existe algum caminho até o lado objetivo (pode andar pra trás)
     const allHavePath = players.every((player) =>
-      hasPathToGoal(player, newBlocked),
+      hasPathToGoal(player, newBlocked)
     );
     if (!allHavePath) {
       if (!silent)
         alert(
-          'Essa barreira cortaria completamente o caminho de pelo menos um jogador.',
+          "Essa barreira cortaria completamente o caminho de pelo menos um jogador."
         );
       return {
         ok: false,
@@ -401,7 +382,7 @@ export default function BloqueioPage() {
 
   function handleCellClick(row: number, col: number) {
     if (winner !== null) return;
-    if (mode === 'move') {
+    if (mode === "move") {
       handleMove(row, col);
     } else {
       handleWallClick(row, col);
@@ -415,9 +396,7 @@ export default function BloqueioPage() {
     pushSnapshot();
 
     setPlayers((prev) =>
-      prev.map((p) =>
-        p.id === cur.id ? { ...p, row, col } : p,
-      ),
+      prev.map((p) => (p.id === cur.id ? { ...p, row, col } : p))
     );
 
     if (isGoal(row, col, cur.goalSide)) {
@@ -452,10 +431,8 @@ export default function BloqueioPage() {
 
     setPlayers((prev) =>
       prev.map((p) =>
-        p.id === currentPlayer.id
-          ? { ...p, wallsLeft: p.wallsLeft - 1 }
-          : p,
-      ),
+        p.id === currentPlayer.id ? { ...p, wallsLeft: p.wallsLeft - 1 } : p
+      )
     );
     setCurrentPlayerId((prev) => nextPlayerId(prev));
   }
@@ -465,7 +442,7 @@ export default function BloqueioPage() {
     setBlockedEdges(new Set());
     setBarriers([]);
     setCurrentPlayerId(0);
-    setMode('move');
+    setMode("move");
     setWinner(null);
     setHistory([]);
     setHoveredCell(null);
@@ -480,12 +457,10 @@ export default function BloqueioPage() {
       const playerOnCell = cellOccupied(row, col);
 
       const isHovered =
-        hoveredCell &&
-        hoveredCell.row === row &&
-        hoveredCell.col === col;
+        hoveredCell && hoveredCell.row === row && hoveredCell.col === col;
 
-      let background = '#020617';
-      const borderColor = '#1f2937';
+      let background = "#020617";
+      const borderColor = "#1f2937";
 
       // bases nas bordas externas (como você ajustou)
       if (row === 0) {
@@ -504,7 +479,7 @@ export default function BloqueioPage() {
       // hover de jogada válida
       let isAllowedHover = false;
       if (isHovered) {
-        if (mode === 'move') {
+        if (mode === "move") {
           isAllowedHover = canMoveTo(row, col);
         } else {
           const result = checkWallPlacement(row, col, { silent: true });
@@ -515,12 +490,12 @@ export default function BloqueioPage() {
       const pawn = playerOnCell ? (
         <div
           style={{
-            width: '70%',
-            height: '70%',
-            borderRadius: '999px',
+            width: "70%",
+            height: "70%",
+            borderRadius: "999px",
             background: playerOnCell.color,
-            border: '2px solid #f9fafb',
-            boxShadow: '0 0 10px rgba(249,250,251,0.8)',
+            border: "2px solid #f9fafb",
+            boxShadow: "0 0 10px rgba(249,250,251,0.8)",
           }}
         />
       ) : null;
@@ -532,36 +507,36 @@ export default function BloqueioPage() {
           onMouseEnter={() => setHoveredCell({ row, col })}
           onMouseLeave={() => {
             setHoveredCell((prev) =>
-              prev && prev.row === row && prev.col === col ? null : prev,
+              prev && prev.row === row && prev.col === col ? null : prev
             );
           }}
           style={{
-            position: 'relative',
-            width: '100%',
-            aspectRatio: '1 / 1',
+            position: "relative",
+            width: "100%",
+            aspectRatio: "1 / 1",
             background,
             border: `1px solid ${borderColor}`,
             padding: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            outline: 'none',
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            outline: "none",
             cursor:
               winner !== null
-                ? 'default'
+                ? "default"
                 : isAllowedHover
-                ? 'pointer'
-                : 'not-allowed',
+                ? "pointer"
+                : "not-allowed",
             boxShadow: isAllowedHover
               ? `0 0 0 2px ${
-                  mode === 'move' ? currentPlayer.color : '#facc15'
+                  mode === "move" ? currentPlayer.color : "#facc15"
                 } inset`
-              : 'none',
-            transition: 'box-shadow 0.08s ease-out, background 0.08s ease-out',
+              : "none",
+            transition: "box-shadow 0.08s ease-out, background 0.08s ease-out",
           }}
         >
           {pawn}
-        </button>,
+        </button>
       );
     }
   }
@@ -570,31 +545,28 @@ export default function BloqueioPage() {
   const barrierOverlays: JSX.Element[] = [];
   const cellPercent = 100 / SIZE;
 
-  function renderBarrier(
-    b: Barrier,
-    opts?: { ghost?: boolean },
-  ): JSX.Element {
+  function renderBarrier(b: Barrier, opts?: { ghost?: boolean }): JSX.Element {
     const ghost = opts?.ghost ?? false;
 
-    if (b.orientation === 'H') {
+    if (b.orientation === "H") {
       const top = (b.row + 1) * cellPercent;
       const left = (b.col + 1) * cellPercent;
       return (
         <div
-          key={b.id + (ghost ? '-ghost' : '')}
+          key={b.id + (ghost ? "-ghost" : "")}
           style={{
-            position: 'absolute',
+            position: "absolute",
             top: `${top}%`,
             left: `${left}%`,
-            transform: 'translate(-50%, -50%)',
+            transform: "translate(-50%, -50%)",
             width: `${cellPercent * 2 * 0.9}%`,
             height: 4,
-            background: ghost ? 'rgba(250,204,21,0.4)' : '#facc15',
+            background: ghost ? "rgba(250,204,21,0.4)" : "#facc15",
             boxShadow: ghost
-              ? '0 0 6px rgba(250,204,21,0.5)'
-              : '0 0 10px rgba(250,204,21,0.9)',
+              ? "0 0 6px rgba(250,204,21,0.5)"
+              : "0 0 10px rgba(250,204,21,0.9)",
             borderRadius: 999,
-            pointerEvents: 'none',
+            pointerEvents: "none",
           }}
         />
       );
@@ -603,20 +575,20 @@ export default function BloqueioPage() {
       const left = (b.col + 1) * cellPercent;
       return (
         <div
-          key={b.id + (ghost ? '-ghost' : '')}
+          key={b.id + (ghost ? "-ghost" : "")}
           style={{
-            position: 'absolute',
+            position: "absolute",
             top: `${top}%`,
             left: `${left}%`,
-            transform: 'translate(-50%, -50%)',
+            transform: "translate(-50%, -50%)",
             width: 4,
             height: `${cellPercent * 2 * 0.9}%`,
-            background: ghost ? 'rgba(250,204,21,0.4)' : '#facc15',
+            background: ghost ? "rgba(250,204,21,0.4)" : "#facc15",
             boxShadow: ghost
-              ? '0 0 6px rgba(250,204,21,0.5)'
-              : '0 0 10px rgba(250,204,21,0.9)',
+              ? "0 0 6px rgba(250,204,21,0.5)"
+              : "0 0 10px rgba(250,204,21,0.9)",
             borderRadius: 999,
-            pointerEvents: 'none',
+            pointerEvents: "none",
           }}
         />
       );
@@ -630,7 +602,7 @@ export default function BloqueioPage() {
 
   // barreira fantasma (hover)
   let ghostBarrier: JSX.Element | null = null;
-  if (mode === 'wall' && hoveredCell) {
+  if (mode === "wall" && hoveredCell) {
     const res = checkWallPlacement(hoveredCell.row, hoveredCell.col, {
       silent: true,
     });
@@ -639,7 +611,7 @@ export default function BloqueioPage() {
         row: res.baseRow,
         col: res.baseCol,
         orientation: res.orientation,
-        id: 'ghost',
+        id: "ghost",
       };
       ghostBarrier = renderBarrier(ghost, { ghost: true });
     }
@@ -651,44 +623,43 @@ export default function BloqueioPage() {
       return `${p.name} venceu!`;
     }
     return `Vez de ${currentPlayer.label} (${
-      mode === 'move' ? 'mover peão' : 'colocar barreira'
+      mode === "move" ? "mover peão" : "colocar barreira"
     })`;
   })();
 
   return (
     <main
       style={{
-        minHeight: '100vh',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: '1rem',
-        background: 'radial-gradient(circle at top, #020617, #000000)',
-        color: '#e5e7eb',
-        fontFamily:
-          'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: "1rem",
+        background: "radial-gradient(circle at top, #020617, #000000)",
+        color: "#e5e7eb",
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
       <div
         style={{
-          width: '100%',
+          width: "100%",
           maxWidth: 960,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem',
+          display: "flex",
+          flexDirection: "column",
+          gap: "1rem",
         }}
       >
         <header
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem',
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.5rem",
           }}
         >
-          <h1 style={{ fontSize: '1.6rem', fontWeight: 700 }}>
+          <h1 style={{ fontSize: "1.6rem", fontWeight: 700 }}>
             Bloqueio – 4 jogadores (9x9 interno + borda)
           </h1>
-          <p style={{ fontSize: '0.9rem', color: '#9ca3af' }}>
+          <p style={{ fontSize: "0.9rem", color: "#9ca3af" }}>
             Objetivo: atravessar o tabuleiro interno e alcançar a borda oposta.
             Cada jogador tem 6 barreiras (2 casas em linha reta). Os peões andam
             1 casa ortogonal ou podem pular em linha reta por cima de outro
@@ -696,11 +667,11 @@ export default function BloqueioPage() {
           </p>
           <p
             style={{
-              fontSize: '0.95rem',
-              padding: '0.3rem 0.8rem',
+              fontSize: "0.95rem",
+              padding: "0.3rem 0.8rem",
               borderRadius: 999,
               background: currentPlayer.color,
-              border: '1px solid #1f2937',
+              border: "1px solid #1f2937",
             }}
           >
             {statusText}
@@ -709,43 +680,43 @@ export default function BloqueioPage() {
 
         <section
           style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '1rem',
-            alignItems: 'flex-start',
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "1rem",
+            alignItems: "flex-start",
           }}
         >
           {/* Tabuleiro + coordenadas */}
           <div
             style={{
-              position: 'relative',
-              flex: '1 1 260px',
+              position: "relative",
+              flex: "1 1 260px",
               maxWidth: 600,
-              borderRadius: '0.75rem',
-              border: '1px solid #1f2937',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
-              background: 'transparent',
-              padding: '1.8rem',
-              boxSizing: 'border-box',
+              borderRadius: "0.75rem",
+              border: "1px solid #1f2937",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
+              background: "transparent",
+              padding: "1.8rem",
+              boxSizing: "border-box",
             }}
           >
             <div
               style={{
-                position: 'relative',
-                width: '100%',
-                aspectRatio: '1 / 1',
-                borderRadius: '0.75rem',
-                overflow: 'hidden',
-                border: '1px solid #1f2937',
-                background: '#020617',
+                position: "relative",
+                width: "100%",
+                aspectRatio: "1 / 1",
+                borderRadius: "0.75rem",
+                overflow: "hidden",
+                border: "1px solid #1f2937",
+                background: "#020617",
               }}
             >
               <div
                 style={{
-                  display: 'grid',
+                  display: "grid",
                   gridTemplateColumns: `repeat(${SIZE}, minmax(0, 1fr))`,
-                  width: '100%',
-                  height: '100%',
+                  width: "100%",
+                  height: "100%",
                 }}
               >
                 {cells}
@@ -762,12 +733,12 @@ export default function BloqueioPage() {
                   <span
                     key={`top-${label}`}
                     style={{
-                      position: 'absolute',
-                      top: '-1.4rem',
+                      position: "absolute",
+                      top: "-1.4rem",
                       left: `${left}%`,
-                      transform: 'translateX(-50%)',
-                      fontSize: '0.8rem',
-                      color: '#9ca3af',
+                      transform: "translateX(-50%)",
+                      fontSize: "0.8rem",
+                      color: "#9ca3af",
                     }}
                   >
                     {label}
@@ -781,12 +752,12 @@ export default function BloqueioPage() {
                   <span
                     key={`bottom-${label}`}
                     style={{
-                      position: 'absolute',
-                      bottom: '-1.4rem',
+                      position: "absolute",
+                      bottom: "-1.4rem",
                       left: `${left}%`,
-                      transform: 'translateX(-50%)',
-                      fontSize: '0.8rem',
-                      color: '#9ca3af',
+                      transform: "translateX(-50%)",
+                      fontSize: "0.8rem",
+                      color: "#9ca3af",
                     }}
                   >
                     {label}
@@ -802,12 +773,12 @@ export default function BloqueioPage() {
                   <span
                     key={`left-${label}`}
                     style={{
-                      position: 'absolute',
-                      left: '-1.4rem',
+                      position: "absolute",
+                      left: "-1.4rem",
                       top: `${top}%`,
-                      transform: 'translateY(-50%)',
-                      fontSize: '0.8rem',
-                      color: '#9ca3af',
+                      transform: "translateY(-50%)",
+                      fontSize: "0.8rem",
+                      color: "#9ca3af",
                     }}
                   >
                     {label}
@@ -821,12 +792,12 @@ export default function BloqueioPage() {
                   <span
                     key={`right-${label}`}
                     style={{
-                      position: 'absolute',
-                      right: '-1.4rem',
+                      position: "absolute",
+                      right: "-1.4rem",
                       top: `${top}%`,
-                      transform: 'translateY(-50%)',
-                      fontSize: '0.8rem',
-                      color: '#9ca3af',
+                      transform: "translateY(-50%)",
+                      fontSize: "0.8rem",
+                      color: "#9ca3af",
                     }}
                   >
                     {label}
@@ -839,78 +810,78 @@ export default function BloqueioPage() {
           {/* Painel lateral */}
           <aside
             style={{
-              flex: '1 1 200px',
+              flex: "1 1 200px",
               minWidth: 220,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.75rem',
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
             }}
           >
             <div
               style={{
-                padding: '0.75rem',
-                borderRadius: '0.75rem',
-                border: '1px solid #1f2937',
-                background: 'rgba(15,23,42,0.9)',
+                padding: "0.75rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #1f2937",
+                background: "rgba(15,23,42,0.9)",
               }}
             >
               <h2
                 style={{
-                  fontSize: '1rem',
+                  fontSize: "1rem",
                   fontWeight: 600,
-                  marginBottom: '0.5rem',
+                  marginBottom: "0.5rem",
                 }}
               >
                 Ações
               </h2>
               <div
                 style={{
-                  display: 'flex',
-                  gap: '0.5rem',
-                  flexWrap: 'wrap',
-                  marginBottom: '0.5rem',
+                  display: "flex",
+                  gap: "0.5rem",
+                  flexWrap: "wrap",
+                  marginBottom: "0.5rem",
                 }}
               >
                 <button
                   type="button"
-                  onClick={() => setMode('move')}
+                  onClick={() => setMode("move")}
                   style={{
-                    padding: '0.4rem 0.8rem',
+                    padding: "0.4rem 0.8rem",
                     borderRadius: 999,
                     border:
-                      mode === 'move'
-                        ? '2px solid #22c55e'
-                        : '1px solid #1f2937',
+                      mode === "move"
+                        ? "2px solid #22c55e"
+                        : "1px solid #1f2937",
                     background:
-                      mode === 'move'
-                        ? 'rgba(34,197,94,0.15)'
-                        : 'rgba(15,23,42,0.9)',
-                    color: '#e5e7eb',
-                    fontSize: '0.85rem',
+                      mode === "move"
+                        ? "rgba(34,197,94,0.15)"
+                        : "rgba(15,23,42,0.9)",
+                    color: "#e5e7eb",
+                    fontSize: "0.85rem",
                     fontWeight: 600,
-                    cursor: 'pointer',
+                    cursor: "pointer",
                   }}
                 >
                   Mover peão
                 </button>
                 <button
                   type="button"
-                  onClick={() => setMode('wall')}
+                  onClick={() => setMode("wall")}
                   style={{
-                    padding: '0.4rem 0.8rem',
+                    padding: "0.4rem 0.8rem",
                     borderRadius: 999,
                     border:
-                      mode === 'wall'
-                        ? '2px solid #facc15'
-                        : '1px solid #1f2937',
+                      mode === "wall"
+                        ? "2px solid #facc15"
+                        : "1px solid #1f2937",
                     background:
-                      mode === 'wall'
-                        ? 'rgba(250,204,21,0.15)'
-                        : 'rgba(15,23,42,0.9)',
-                    color: '#e5e7eb',
-                    fontSize: '0.85rem',
+                      mode === "wall"
+                        ? "rgba(250,204,21,0.15)"
+                        : "rgba(15,23,42,0.9)",
+                    color: "#e5e7eb",
+                    fontSize: "0.85rem",
                     fontWeight: 600,
-                    cursor: 'pointer',
+                    cursor: "pointer",
                   }}
                 >
                   Colocar barreira
@@ -920,17 +891,16 @@ export default function BloqueioPage() {
                   onClick={handleUndo}
                   disabled={history.length === 0}
                   style={{
-                    padding: '0.4rem 0.8rem',
+                    padding: "0.4rem 0.8rem",
                     borderRadius: 999,
-                    border: '1px solid #1f2937',
+                    border: "1px solid #1f2937",
                     background:
                       history.length === 0
-                        ? 'rgba(15,23,42,0.5)'
-                        : 'rgba(15,23,42,0.9)',
-                    color: history.length === 0 ? '#4b5563' : '#e5e7eb',
-                    fontSize: '0.85rem',
-                    cursor:
-                      history.length === 0 ? 'not-allowed' : 'pointer',
+                        ? "rgba(15,23,42,0.5)"
+                        : "rgba(15,23,42,0.9)",
+                    color: history.length === 0 ? "#4b5563" : "#e5e7eb",
+                    fontSize: "0.85rem",
+                    cursor: history.length === 0 ? "not-allowed" : "pointer",
                   }}
                 >
                   Desfazer
@@ -939,66 +909,66 @@ export default function BloqueioPage() {
                   type="button"
                   onClick={handleRestart}
                   style={{
-                    padding: '0.4rem 0.8rem',
+                    padding: "0.4rem 0.8rem",
                     borderRadius: 999,
-                    border: '1px solid #1f2937',
-                    background: 'rgba(15,23,42,0.9)',
-                    color: '#e5e7eb',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
+                    border: "1px solid #1f2937",
+                    background: "rgba(15,23,42,0.9)",
+                    color: "#e5e7eb",
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
                   }}
                 >
                   Reiniciar
                 </button>
               </div>
 
-              {mode === 'wall' && (
+              {mode === "wall" && (
                 <div
                   style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    flexWrap: 'wrap',
-                    marginBottom: '0.5rem',
+                    display: "flex",
+                    gap: "0.5rem",
+                    flexWrap: "wrap",
+                    marginBottom: "0.5rem",
                   }}
                 >
                   <button
                     type="button"
-                    onClick={() => setWallOrientation('H')}
+                    onClick={() => setWallOrientation("H")}
                     style={{
-                      padding: '0.35rem 0.75rem',
+                      padding: "0.35rem 0.75rem",
                       borderRadius: 999,
                       border:
-                        wallOrientation === 'H'
-                          ? '2px solid #facc15'
-                          : '1px solid #1f2937',
+                        wallOrientation === "H"
+                          ? "2px solid #facc15"
+                          : "1px solid #1f2937",
                       background:
-                        wallOrientation === 'H'
-                          ? 'rgba(250,204,21,0.15)'
-                          : 'rgba(15,23,42,1)',
-                      color: '#e5e7eb',
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
+                        wallOrientation === "H"
+                          ? "rgba(250,204,21,0.15)"
+                          : "rgba(15,23,42,1)",
+                      color: "#e5e7eb",
+                      fontSize: "0.8rem",
+                      cursor: "pointer",
                     }}
                   >
                     Barreira horizontal
                   </button>
                   <button
                     type="button"
-                    onClick={() => setWallOrientation('V')}
+                    onClick={() => setWallOrientation("V")}
                     style={{
-                      padding: '0.35rem 0.75rem',
+                      padding: "0.35rem 0.75rem",
                       borderRadius: 999,
                       border:
-                        wallOrientation === 'V'
-                          ? '2px solid #facc15'
-                          : '1px solid #1f2937',
+                        wallOrientation === "V"
+                          ? "2px solid #facc15"
+                          : "1px solid #1f2937",
                       background:
-                        wallOrientation === 'V'
-                          ? 'rgba(250,204,21,0.15)'
-                          : 'rgba(15,23,42,1)',
-                      color: '#e5e7eb',
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
+                        wallOrientation === "V"
+                          ? "rgba(250,204,21,0.15)"
+                          : "rgba(15,23,42,1)",
+                      color: "#e5e7eb",
+                      fontSize: "0.8rem",
+                      cursor: "pointer",
                     }}
                   >
                     Barreira vertical
@@ -1009,39 +979,39 @@ export default function BloqueioPage() {
 
             <div
               style={{
-                padding: '0.75rem',
-                borderRadius: '0.75rem',
-                border: '1px solid #1f2937',
-                background: 'rgba(15,23,42,0.9)',
+                padding: "0.75rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #1f2937",
+                background: "rgba(15,23,42,0.9)",
               }}
             >
               <h2
                 style={{
-                  fontSize: '1rem',
+                  fontSize: "1rem",
                   fontWeight: 600,
-                  marginBottom: '0.5rem',
+                  marginBottom: "0.5rem",
                 }}
               >
                 Jogadores
               </h2>
               <ul
                 style={{
-                  listStyle: 'none',
+                  listStyle: "none",
                   padding: 0,
                   margin: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.35rem',
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.35rem",
                 }}
               >
                 {players.map((p) => (
                   <li
                     key={p.id}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.85rem',
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      fontSize: "0.85rem",
                       opacity: winner !== null && winner !== p.id ? 0.5 : 1,
                     }}
                   >
@@ -1051,7 +1021,7 @@ export default function BloqueioPage() {
                         height: 12,
                         borderRadius: 999,
                         background: p.color,
-                        border: '1px solid #f9fafb',
+                        border: "1px solid #f9fafb",
                       }}
                     />
                     <span
@@ -1064,7 +1034,7 @@ export default function BloqueioPage() {
                     >
                       {p.name}
                     </span>
-                    <span style={{ color: '#9ca3af', marginLeft: 'auto' }}>
+                    <span style={{ color: "#9ca3af", marginLeft: "auto" }}>
                       Barreiras: {p.wallsLeft}
                     </span>
                   </li>
