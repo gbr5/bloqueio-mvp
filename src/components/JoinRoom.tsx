@@ -106,6 +106,14 @@ export function JoinRoom({ onCancel }: JoinRoomProps) {
         joinResult.playerId
       );
 
+      // Store player ID in localStorage
+      if (joinResult.playerId !== undefined) {
+        localStorage.setItem(
+          `room_${roomCode}_playerId`,
+          joinResult.playerId.toString()
+        );
+      }
+
       // Navigate to lobby with isHost=false query param
       router.push(`/room/${roomCode}/lobby?isHost=false`);
     } catch (err) {

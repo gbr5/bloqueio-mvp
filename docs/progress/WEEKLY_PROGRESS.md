@@ -23,19 +23,27 @@
   - Created database client wrapper (`src/lib/db.ts`)
   - Built `useGameRoom` hook with full CRUD operations
   - All tests passing ✅
-- 🔄 **Phase 3 IN PROGRESS:** Create/Join Flow
-  - ⏱️ Started: 2:30 PM - Current: 1:15 PM (6 hours building)
-  - ⏱️ Testing Started: 1:15 PM
+- ✅ **Phase 3 COMPLETE:** Create/Join Flow
+  - ⏱️ Started: 2:30 PM - Completed: 5:45 PM (~3 hours)
+  - ⏱️ Testing: 1:15 PM - 5:00 PM (~4 hours debugging)
   - ✅ All 4 UI components (HomeScreen, CreateRoom, JoinRoom, WaitingLobby)
-  - ✅ Server Actions for database operations (createGameRoom, loadGameRoom, updateGameRoom)
+  - ✅ Server Actions for database operations (createGameRoom, loadGameRoom, updateGameRoom, joinGameRoom)
   - ✅ CreateRoom connected to real database
+  - ✅ JoinRoom with player assignment
+  - ✅ WaitingLobby with real-time polling (2s interval)
+  - ✅ Player management (host + up to 3 guests)
+  - ✅ Room code validation and sharing
+  - ✅ Host badge and player count display
   - ⚠️ Architecture pivot: Client hooks → Server Actions (Next.js best practice)
-  - 🔄 Currently: Testing room creation in browser
-  - ⏳ TODO: Wire up JoinRoom and WaitingLobby
-  - ⏳ TODO: Implement polling logic
+  - 🎉 PR #1 merged to main
+- 🔄 **Phase 4 STARTED:** Sync Game State
+  - ⏱️ Started: 5:50 PM - Current
+  - 📝 Documentation created
+  - Branch: `feature/sync-game-state`
+  - ⏳ Next: Implement Start Game button
 
-**Status:** 2.5/5 MVP phases (Phase 3 ~75% complete)  
-**Next:** Phase 3 - Create/Join Flow (6-8 hours)
+**Status:** 3/5 MVP phases (Phase 4 just started)  
+**Next:** Phase 4 - Sync Game State (8-10 hours)
 
 ---
 
