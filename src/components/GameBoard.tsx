@@ -65,9 +65,12 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
     }, 2000);
 
     return () => clearInterval(pollInterval);
-  }, [roomCode, router]);
+  }, [roomCode, router, showGameOver]);
 
   // Sync moves to database (Task 5)
+  // NOTE: Not used yet - BloqueioPage is still local-only for MVP
+  // This function will be called when we make BloqueioPage a controlled component
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleGameStateChange = async (newState: GameSnapshot) => {
     // Optimistic update
     setGameState(newState);
@@ -222,7 +225,7 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
                   Final Standings
                 </h3>
                 <div className="space-y-2">
-                  {gameState.players.map((player, idx) => (
+                  {gameState.players.map((player) => (
                     <div
                       key={player.id}
                       className={`flex items-center gap-3 p-2 rounded ${
@@ -232,7 +235,7 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
                       }`}
                     >
                       <div
-                        className="w-6 h-6 rounded-full border-2 border-white flex-shrink-0"
+                        className="w-6 h-6 rounded-full border-2 border-white shrink-0"
                         style={{ backgroundColor: player.color }}
                       />
                       <span className="text-white text-sm flex-1">
