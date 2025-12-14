@@ -82,20 +82,20 @@ export function WaitingLobby({
       alert("Need at least 2 players to start");
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       const result = await startGame(roomCode);
-      
+
       if (result.error) {
         alert(result.error);
         setLoading(false);
         return;
       }
-      
+
       console.log("✅ [WaitingLobby] Game started, navigating to game board");
-      
+
       // Navigate to game board
       router.push(`/room/${roomCode}/game`);
     } catch (error) {

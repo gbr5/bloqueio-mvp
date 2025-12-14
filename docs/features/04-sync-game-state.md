@@ -54,6 +54,7 @@ useEffect(() => {
 ```
 
 **Why Polling (not WebSockets)?**
+
 - ✅ Simple - 20 lines of code
 - ✅ No extra dependencies
 - ✅ Works with serverless (Vercel + Neon)
@@ -72,6 +73,7 @@ useEffect(() => {
 **Goal:** Host clicks "Start Game" → Room status changes to "playing" → All players navigate to game
 
 **Files to Modify:**
+
 - `src/components/WaitingLobby.tsx` - Add Start Game button logic
 - `src/lib/actions/game-room.ts` - Add `startGame()` server action
 
@@ -91,6 +93,7 @@ const handleStartGame = async () => {
 ```
 
 **Acceptance Criteria:**
+
 - [ ] Host sees "Start Game" button (enabled when 2+ players)
 - [ ] Clicking starts game (status → "playing")
 - [ ] All players auto-navigate to `/room/[code]/game`
@@ -103,6 +106,7 @@ const handleStartGame = async () => {
 **Goal:** Active game page with real game board
 
 **Files to Create/Modify:**
+
 - `src/app/room/[code]/game/page.tsx` - Game page wrapper
 - `src/components/GameBoard.tsx` - Main game board component (refactor from `game.tsx`)
 
@@ -114,6 +118,7 @@ const handleStartGame = async () => {
 4. Set up polling for updates
 
 **Acceptance Criteria:**
+
 - [ ] Game board renders correctly
 - [ ] Shows all players in correct positions
 - [ ] Displays current player indicator
@@ -126,6 +131,7 @@ const handleStartGame = async () => {
 **Goal:** All clients stay in sync via polling
 
 **Files to Modify:**
+
 - `src/components/GameBoard.tsx` - Add polling logic
 
 **Implementation:**
@@ -135,10 +141,10 @@ const handleStartGame = async () => {
 useEffect(() => {
   const pollInterval = setInterval(async () => {
     const result = await loadGameRoom(roomCode);
-    
+
     if (result.room) {
       const latestState = result.room.game_state;
-      
+
       // Only update if state changed (compare updated_at timestamps)
       if (new Date(result.room.updated_at) > lastUpdateTime) {
         setGameState(latestState);
@@ -152,6 +158,7 @@ useEffect(() => {
 ```
 
 **Acceptance Criteria:**
+
 - [ ] Polling runs every 1-2 seconds
 - [ ] State updates when database changes
 - [ ] No unnecessary re-renders (check timestamps)
@@ -164,6 +171,7 @@ useEffect(() => {
 **Goal:** Only current player can make moves
 
 **Files to Modify:**
+
 - `src/components/GameBoard.tsx` - Add turn validation
 
 **Implementation:**
@@ -180,12 +188,13 @@ const handleCellClick = (row: number, col: number) => {
     alert("Not your turn!");
     return;
   }
-  
+
   // Process move...
 };
 ```
 
 **Acceptance Criteria:**
+
 - [ ] Player knows their own ID
 - [ ] UI shows "Your Turn" or "Player X's Turn"
 - [ ] Clicks disabled when not player's turn
@@ -198,6 +207,7 @@ const handleCellClick = (row: number, col: number) => {
 **Goal:** When player moves, update database and all clients see it
 
 **Files to Modify:**
+
 - `src/components/GameBoard.tsx` - Add move sync logic
 - `src/lib/actions/game-room.ts` - Update move handling
 
@@ -211,18 +221,19 @@ const handleMove = async (row: number, col: number) => {
 
   // Sync to database
   const result = await updateGameRoom(roomCode, newState);
-  
+
   if (result.error) {
     // Rollback on error
     setGameState(gameState);
     alert("Move failed, please try again");
   }
-  
+
   // Other clients will see move via polling
 };
 ```
 
 **Acceptance Criteria:**
+
 - [ ] Move updates locally instantly (optimistic)
 - [ ] Move syncs to database
 - [ ] Other players see move within 2 seconds
@@ -235,6 +246,7 @@ const handleMove = async (row: number, col: number) => {
 **Goal:** Detect winner and show game over screen
 
 **Files to Modify:**
+
 - `src/components/GameBoard.tsx` - Add win detection
 - `src/components/GameOver.tsx` - Create game over screen
 
@@ -259,6 +271,7 @@ if (winner !== null) {
 ```
 
 **Acceptance Criteria:**
+
 - [ ] Winner detection works correctly
 - [ ] All players see winner announcement
 - [ ] Game board locks (no more moves)
@@ -271,6 +284,7 @@ if (winner !== null) {
 ### Manual Testing
 
 - [ ] **2-Player Game:**
+
   - [ ] Create room (Player 1)
   - [ ] Join room (Player 2)
   - [ ] Start game
@@ -280,6 +294,7 @@ if (winner !== null) {
   - [ ] Game ends correctly
 
 - [ ] **4-Player Game:**
+
   - [ ] All 4 players join
   - [ ] All see game start
   - [ ] Turns work in sequence (P1→P2→P3→P4→P1...)
@@ -299,12 +314,14 @@ if (winner !== null) {
 ### Database Load
 
 **Current:**
+
 - 2 players × 1.5s poll = ~80 requests/min
 - 4 players × 1.5s poll = ~160 requests/min
 
 **Neon Free Tier:** 100 hours compute/month = plenty for testing
 
 **Optimization if Needed:**
+
 - Increase poll interval to 2-3s (still acceptable)
 - Add exponential backoff when no changes
 - Use HTTP caching headers
@@ -312,6 +329,7 @@ if (winner !== null) {
 ### State Size
 
 **Current Game State:** ~2KB (4 players + barriers)
+
 - Small enough for JSONB storage
 - Fast to parse/stringify
 - No optimization needed for MVP
@@ -325,6 +343,7 @@ if (winner !== null) {
 **Problem:** How does client know their player ID?
 
 **Options:**
+
 1. **localStorage** - Store player ID when joining/creating
 2. **URL param** - Pass as `?playerId=0`
 3. **Cookie** - Server-side session
@@ -336,12 +355,15 @@ if (winner !== null) {
 localStorage.setItem(`room_${roomCode}_playerId`, playerId.toString());
 
 // On game page
-const myPlayerId = parseInt(localStorage.getItem(`room_${roomCode}_playerId`) || '0');
+const myPlayerId = parseInt(
+  localStorage.getItem(`room_${roomCode}_playerId`) || "0"
+);
 ```
 
 ### Reconnection Handling
 
 **MVP Approach:** No automatic reconnection
+
 - Player refreshes → Load from database → Continue playing
 - Player closes tab → Game continues without them
 
@@ -376,11 +398,13 @@ const myPlayerId = parseInt(localStorage.getItem(`room_${roomCode}_playerId`) ||
 ### Session 1: December 14, 2025 (2:00 PM - TBD)
 
 **Starting Point:**
+
 - ✅ Phase 3 merged (create/join flow works)
 - ✅ Branch created: `feature/sync-game-state`
 - ✅ Documentation created
 
 **Tasks Completed:**
+
 - [ ] Task 1: Start Game Button
 - [ ] Task 2: Game Board Component
 - [ ] Task 3: Game State Polling
@@ -391,6 +415,7 @@ const myPlayerId = parseInt(localStorage.getItem(`room_${roomCode}_playerId`) ||
 **Blockers:** None currently
 
 **Notes:**
+
 - Starting with Task 1 (Start Game button)
 - Using polling strategy (not WebSockets)
 - Player ID stored in localStorage
