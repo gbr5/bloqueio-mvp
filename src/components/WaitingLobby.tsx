@@ -65,23 +65,6 @@ export function WaitingLobby({
     );
   }
 
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
-        <div className="text-center">
-          <p className="text-red-400 mb-4">Failed to load room</p>
-          <button
-            onClick={() => router.push("/")}
-            className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-          >
-            Back to Home
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   const players = room.game_state.players;
   const playerCount = players.length;
 
