@@ -79,9 +79,7 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
         <div className="text-white text-sm">
           <p className="font-semibold mb-2">Room: {roomCode}</p>
           {myPlayerId !== null && (
-            <p className="text-slate-300">
-              You are: Player {myPlayerId + 1}
-            </p>
+            <p className="text-slate-300">You are: Player {myPlayerId + 1}</p>
           )}
           <p className="text-slate-400 text-xs mt-1">
             Current Turn: Player {gameState.currentPlayerId + 1}
