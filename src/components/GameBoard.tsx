@@ -23,21 +23,17 @@ interface GameBoardProps {
 
 export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
   const router = useRouter();
-  const [room, setRoom] = useState<GameRoom>(initialRoom);
   const [gameState, setGameState] = useState<GameSnapshot>(
     initialRoom.game_state
   );
 
   // Get player ID from localStorage (set during join/create)
-  const [myPlayerId, setMyPlayerId] = useState<number | null>(null);
-
-  useEffect(() => {
-    // Retrieve player ID from localStorage
+  // Using initializer function to avoid setState in useEffect
+  const [myPlayerId] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
     const storedPlayerId = localStorage.getItem(`room_${roomCode}_playerId`);
-    if (storedPlayerId) {
-      setMyPlayerId(parseInt(storedPlayerId, 10));
-    }
-  }, [roomCode]);
+    return storedPlayerId ? parseInt(storedPlayerId, 10) : null;
+  });
 
   // Poll for game state updates every 2 seconds
   useEffect(() => {
@@ -46,8 +42,6 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
         const result = await loadGameRoom(roomCode);
 
         if (result.room) {
-          setRoom(result.room);
-
           // Update game state if changed
           const latestState = result.room.game_state;
           setGameState(latestState);
