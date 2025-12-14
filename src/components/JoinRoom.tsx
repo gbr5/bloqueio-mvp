@@ -12,7 +12,7 @@
 
 import { useState, useRef, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { loadGameRoom } from "@/lib/actions/game-room";
+import { loadGameRoom, joinGameRoom } from "@/lib/actions/game-room";
 
 interface JoinRoomProps {
   onCancel: () => void;
@@ -76,12 +76,35 @@ export function JoinRoom({ onCancel }: JoinRoomProps) {
     setError(null);
 
     try {
-      // Verify room exists in database
-      const result = await loadGameRoom(roomCode);
+      // Verify room exists and is joinable
+      const roomResult = await loadGameRoom(roomCode);
 
-      if (result.error || !result.room) {
+      if (roomResult.error || !roomResult.room) {
         throw new Error("Room not found");
       }
+
+      const room = roomResult.room;
+
+      // Check if room is full or already started
+      if (room.game_state.players.length >= 4) {
+        throw new Error("Room is full");
+      }
+
+      if (room.status === "playing" || room.status === "finished") {
+        throw new Error("Game already started");
+      }
+
+      // Join the room (adds player to database)
+      const joinResult = await joinGameRoom(roomCode);
+
+      if (joinResult.error) {
+        throw new Error(joinResult.error);
+      }
+
+      console.log(
+        "✅ [JoinRoom] Successfully joined as player",
+        joinResult.playerId
+      );
 
       // Navigate to lobby with isHost=false query param
       router.push(`/room/${roomCode}/lobby?isHost=false`);

@@ -10,11 +10,10 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { loadGameRoom } from "@/lib/actions/game-room";
 import type { GameRoom } from "@/types/game";
-import { PLAYER_BASE_COLORS } from "@/types/game";
 
 interface WaitingLobbyProps {
   roomCode: string;
@@ -53,6 +52,9 @@ export function WaitingLobby({
     return () => clearInterval(pollInterval);
   }, [roomCode, router]);
 
+  const players = room.game_state.players;
+  const playerCount = useMemo(() => (players ? players.length : 0), [players]);
+
   // Loading state - show spinner while room loads
   if (loading || !room) {
     return (
@@ -64,9 +66,6 @@ export function WaitingLobby({
       </div>
     );
   }
-
-  const players = room.game_state.players;
-  const playerCount = players.length;
 
   const handleCopyCode = async () => {
     try {
@@ -125,36 +124,37 @@ export function WaitingLobby({
         {/* Players List */}
         <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 mb-6">
           <h2 className="text-xl font-semibold text-white mb-4">
-            Players ({players.length}/4)
+            Players ({playerCount}/4)
           </h2>
           <div className="space-y-3">
-            {players.map((player) => (
-              <div
-                key={player.id}
-                className="flex items-center gap-3 p-3 bg-slate-900/50 rounded-lg"
-              >
-                {/* Color indicator */}
+            {players &&
+              players.map((player) => (
                 <div
-                  className="w-8 h-8 rounded-full border-2 border-white"
-                  style={{ backgroundColor: player.color }}
-                />
+                  key={player.id}
+                  className="flex items-center gap-3 p-3 bg-slate-900/50 rounded-lg"
+                >
+                  {/* Color indicator */}
+                  <div
+                    className="w-8 h-8 rounded-full border-2 border-white"
+                    style={{ backgroundColor: player.color }}
+                  />
 
-                {/* Player name */}
-                <span className="text-white font-medium flex-1">
-                  {player.name}
-                </span>
-
-                {/* Host badge */}
-                {player.id === room.hostPlayerId && (
-                  <span className="px-2 py-1 bg-yellow-600 text-xs font-semibold rounded text-white">
-                    HOST
+                  {/* Player name */}
+                  <span className="text-white font-medium flex-1">
+                    {player.name}
                   </span>
-                )}
-              </div>
-            ))}
+
+                  {/* Host badge */}
+                  {player.id === room.host_player_id && (
+                    <span className="px-2 py-1 bg-yellow-600 text-xs font-semibold rounded text-white">
+                      HOST
+                    </span>
+                  )}
+                </div>
+              ))}
 
             {/* Empty slots */}
-            {Array.from({ length: 4 - players.length }).map((_, i) => (
+            {Array.from({ length: 4 - playerCount }).map((_, i) => (
               <div
                 key={`empty-${i}`}
                 className="flex items-center gap-3 p-3 bg-slate-900/20 rounded-lg border border-dashed border-slate-700"
@@ -171,11 +171,11 @@ export function WaitingLobby({
         {/* Game Info */}
         <div className="bg-blue-900/20 border border-blue-800 rounded-lg p-4 mb-6">
           <p className="text-blue-200 text-sm text-center">
-            {players.length < 2 && "Waiting for at least 2 players to start..."}
-            {players.length >= 2 &&
-              players.length < 4 &&
+            {playerCount < 2 && "Waiting for at least 2 players to start..."}
+            {playerCount >= 2 &&
+              playerCount < 4 &&
               "Ready to start! More players can join until game begins."}
-            {players.length === 4 && "Room is full! Ready to start."}
+            {playerCount === 4 && "Room is full! Ready to start."}
           </p>
         </div>
 

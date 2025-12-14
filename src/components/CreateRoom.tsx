@@ -15,10 +15,22 @@ import { useRouter } from "next/navigation";
 import { createGameRoom } from "@/lib/actions/game-room";
 import type { GameSnapshot } from "@/types/game";
 
-// Helper to create initial game state (empty lobby)
+// Helper to create initial game state with host player
 function createInitialGameState(): GameSnapshot {
+  // Create the host player (Player 1 - Red)
+  const hostPlayer = {
+    id: 0 as const,
+    row: 5,
+    col: 0,
+    goalSide: "RIGHT" as const,
+    wallsLeft: 6,
+    color: "#ef4444",
+    label: "P1",
+    name: "Player 1 (You)",
+  };
+
   return {
-    players: [],
+    players: [hostPlayer],
     blockedEdges: [],
     barriers: [],
     currentPlayerId: 0,
@@ -44,6 +56,7 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
     try {
       const initialState = createInitialGameState();
       const result = await createGameRoom(initialState);
+      console.log("🚪 [CreateRoom] createGameRoom result:", result);
 
       if (result.error) {
         setError(result.error);

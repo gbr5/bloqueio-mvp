@@ -21,6 +21,8 @@ export default async function LobbyPage({ params, searchParams }: PageProps) {
   // Load room from database
   const result = await loadGameRoom(code);
 
+  console.log("🚪 [Lobby Page] Loaded room:", result);
+
   if (result.error || !result.room) {
     // Room not found, redirect to home
     redirect("/");

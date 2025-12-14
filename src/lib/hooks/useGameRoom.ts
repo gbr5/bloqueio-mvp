@@ -152,11 +152,11 @@ export function useGameRoom(): UseGameRoomReturn {
         const gameRoom: GameRoom = {
           id: row.id,
           status: row.status,
-          hostPlayerId: row.host_player_id,
-          currentPlayerId: row.current_player_id,
-          gameState,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at,
+          host_player_id: row.host_player_id,
+          current_player_id: row.current_player_id,
+          game_state: gameState,
+          created_at: row.created_at.toISOString(),
+          updated_at: row.updated_at.toISOString(),
         };
 
         setRoom(gameRoom);
