@@ -13,8 +13,8 @@
 
 ### 1. HomeScreen Navigation
 
-- [ ] Open http://localhost:3000
-- [ ] Verify HomeScreen displays with 3 buttons
+- [x] Open http://localhost:3000
+- [x] Verify HomeScreen displays with 3 buttons
 - [ ] Click "Create New Game" → Should navigate to CreateRoom
 - [ ] Go back, click "Join Game" → Should navigate to JoinRoom
 - [ ] Go back, click "Play Offline" → Should navigate to placeholder game screen
@@ -98,10 +98,32 @@ After creating a room:
 
 ## Issues Found
 
-Document any bugs/issues discovered during testing here.
+### Issue #1: Database Schema Mismatch ✅ FIXED
+- **Found:** 1:22 PM
+- **Fixed:** 1:22 PM (5 minutes)
+- **Problem:** Server Actions used `room_code` column, but schema has `id` column
+- **Root Cause:** Schema in `init-db.sql` uses different column naming:
+  - `id` (TEXT) instead of `room_code`
+  - `host_player_id` and `current_player_id` required fields
+- **Solution:** Updated all Server Actions to match actual schema
+  - `createGameRoom`: INSERT with id, host_player_id, current_player_id
+  - `loadGameRoom`: SELECT WHERE id = ...
+  - `updateGameRoom`: UPDATE current_player_id
+- **Commit:** `6811367`
+- **Status:** ✅ Ready to retest
 
 ---
 
 **Test Session:** ⏱️ In Progress  
 **Tester:** Manual browser testing  
 **Environment:** Development (localhost:3000)
+
+## Test Results
+
+### Round 1: Initial Test (1:15 PM - 1:22 PM)
+- ❌ Room creation failed with schema error
+- ✅ Error logging worked perfectly
+- ✅ Fix applied in 5 minutes
+
+### Round 2: After Schema Fix (1:22 PM - ongoing)
+_Waiting for test results..._
