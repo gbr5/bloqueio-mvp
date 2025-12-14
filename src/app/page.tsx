@@ -1,6 +1,17 @@
 'use client';
 
 import { JSX, useState } from 'react';
+import type {
+  PlayerId,
+  GoalSide,
+  Player,
+  Mode,
+  Cell,
+  Orientation,
+  Barrier,
+  GameSnapshot,
+} from '@/types/game';
+import { PLAYER_BASE_COLORS } from '@/types/game';
 
 // Tabuleiro original interno é 9x9, com uma borda extra em volta
 const INNER_SIZE = 9;
@@ -10,47 +21,6 @@ const COL_LABELS = 'ABCDEFGHI'.split('');
 const ROW_LABELS = Array.from({ length: INNER_SIZE }, (_, i) =>
   String(i + 1),
 );
-
-type PlayerId = 0 | 1 | 2 | 3;
-type GoalSide = 'TOP' | 'RIGHT' | 'BOTTOM' | 'LEFT';
-
-type Player = {
-  id: PlayerId;
-  row: number;
-  col: number;
-  goalSide: GoalSide;
-  wallsLeft: number;
-  color: string;
-  label: string;
-  name: string;
-};
-
-type Mode = 'move' | 'wall';
-type Cell = { row: number; col: number };
-
-type BarrierOrientation = 'H' | 'V';
-
-type Barrier = {
-  row: number; // baseRow (top row do bloco 2x2)
-  col: number; // baseCol (left col do bloco 2x2)
-  orientation: BarrierOrientation;
-  id: string;
-};
-
-type GameSnapshot = {
-  players: Player[];
-  blockedEdges: string[];
-  barriers: Barrier[];
-  currentPlayerId: PlayerId;
-  winner: PlayerId | null;
-};
-
-const PLAYER_BASE_COLORS: Record<PlayerId, string> = {
-  0: 'rgba(239,68,68,0.24)', // red
-  1: 'rgba(59,130,246,0.24)', // blue
-  2: 'rgba(34,197,94,0.24)', // green
-  3: 'rgba(245,158,11,0.24)', // yellow
-};
 
 function edgeKey(r1: number, c1: number, r2: number, c2: number) {
   if (r1 > r2 || (r1 === r2 && c1 > c2)) {
@@ -241,7 +211,7 @@ export default function BloqueioPage() {
   const [winner, setWinner] = useState<PlayerId | null>(null);
   const [history, setHistory] = useState<GameSnapshot[]>([]);
   const [wallOrientation, setWallOrientation] =
-    useState<BarrierOrientation>('H');
+    useState<Orientation>('H');
   const [hoveredCell, setHoveredCell] = useState<Cell | null>(null);
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId)!;
@@ -295,7 +265,7 @@ export default function BloqueioPage() {
     ok: boolean;
     baseRow: number;
     baseCol: number;
-    orientation: BarrierOrientation;
+    orientation: Orientation;
     edgesToAdd: string[];
   };
 
