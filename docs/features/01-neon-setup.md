@@ -1,9 +1,9 @@
 # Neon Database Setup - Implementation Plan
 
-> **Status:** 🟡 In Progress  
+> **Status:** � Complete  
 > **Priority:** P0 (Blocker for all other features)  
 > **Estimated Time:** 30-60 minutes  
-> **Actual Time:** TBD
+> **Actual Time:** 45 minutes
 
 ## Context
 
@@ -106,7 +106,7 @@ DATABASE_URL="postgresql://user:pass@ep-xxx.neon.tech/bloqueio?sslmode=require"
 - [ ] Go to Vercel project → Storage tab
 - [ ] Click "Create" → Select "Neon"
 - [ ] Click "Create Database"
-- [ ] Name it: `bloqueio-db`
+- [ ] Name it: `neon-yellow-flower` <!-- `bloqueio-db` -->
 - [ ] Select region: US East (or closest to users)
 - [ ] Copy `DATABASE_URL` for local development
 
