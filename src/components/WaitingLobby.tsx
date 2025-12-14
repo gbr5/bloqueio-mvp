@@ -29,6 +29,7 @@ export function WaitingLobby({
   const router = useRouter();
   const [room, setRoom] = useState<GameRoom>(initialRoom);
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Poll for room updates every 2 seconds
@@ -77,6 +78,17 @@ export function WaitingLobby({
     }
   };
 
+  const handleCopyLink = async () => {
+    const url = `${window.location.origin}/room/${roomCode}/lobby`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy link:", err);
+    }
+  };
+
   const handleStartGame = async () => {
     if (playerCount < 2) {
       alert("Need at least 2 players to start");
@@ -120,21 +132,43 @@ export function WaitingLobby({
 
         {/* Room Code Display */}
         <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 mb-6">
-          <div className="text-center">
-            <p className="text-slate-400 text-sm mb-2">Room Code</p>
-            <div className="flex items-center justify-center gap-4">
-              <p className="text-4xl font-mono font-bold text-blue-400 tracking-widest">
-                {roomCode}
-              </p>
+          <div className="text-center space-y-4">
+            <div>
+              <p className="text-slate-400 text-sm mb-2">Room Code</p>
+              <div className="flex items-center justify-center gap-3">
+                <p className="text-4xl font-mono font-bold text-blue-400 tracking-widest">
+                  {roomCode}
+                </p>
+                <button
+                  onClick={handleCopyCode}
+                  className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors text-sm"
+                >
+                  {copied ? "✓ Copied" : "📋 Copy"}
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-700 pt-4">
               <button
-                onClick={handleCopyCode}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors text-sm"
+                onClick={handleCopyLink}
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
               >
-                {copied ? "✓ Copied" : "📋 Copy"}
+                {copiedLink ? (
+                  <>
+                    <span>✓</span>
+                    <span>Link Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🔗</span>
+                    <span>Copy Room Link</span>
+                  </>
+                )}
               </button>
             </div>
-            <p className="text-slate-500 text-sm mt-2">
-              Share this code with friends to invite them
+
+            <p className="text-slate-500 text-xs">
+              Share the code or link with friends to invite them
             </p>
           </div>
         </div>

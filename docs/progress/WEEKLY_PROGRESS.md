@@ -36,14 +36,20 @@
   - ✅ Host badge and player count display
   - ⚠️ Architecture pivot: Client hooks → Server Actions (Next.js best practice)
   - 🎉 PR #1 merged to main
-- 🔄 **Phase 4 STARTED:** Sync Game State
-  - ⏱️ Started: 5:50 PM - Current
-  - 📝 Documentation created
-  - Branch: `feature/sync-game-state`
-  - ⏳ Next: Implement Start Game button
+- ✅ **Phase 4 COMPLETE:** Sync Game State
+  - ⏱️ Started: 5:50 PM - Completed: 11:30 PM (~6 hours)
+  - 📝 All 6 tasks completed (Start Game, GameBoard, Polling, Turn Validation, Move Sync, Winner Detection)
+  - ✅ Infrastructure ready for multiplayer
+  - ⚠️ BloqueioPage still local-only (intentional for MVP)
+  - 🎉 Merged to main
+- 🔄 **Phase 5 STARTED:** Polish & Deploy
+  - ⏱️ Started: 11:30 PM
+  - 📝 Documentation created (`docs/features/05-polish-and-deploy.md`)
+  - Branch: `feature/polish-and-deploy`
+  - ⏳ Next: Loading states and error handling
 
-**Status:** 3/5 MVP phases (Phase 4 just started)  
-**Next:** Phase 4 - Sync Game State (8-10 hours)
+**Status:** 4/5 MVP phases (Phase 5 just started)  
+**Next:** Phase 5 - Polish & Deploy (4-6 hours)
 
 ---
 
