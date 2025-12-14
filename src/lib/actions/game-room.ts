@@ -150,14 +150,18 @@ export async function joinGameRoom(
   playerName?: string
 ): Promise<{ success?: boolean; playerId?: number; error?: string }> {
   try {
+    console.log("🚪 [joinGameRoom] Attempting to join room:", roomCode);
+    
     // Load current room state
     const result = await loadGameRoom(roomCode);
 
     if (result.error || !result.room) {
+      console.error("❌ [joinGameRoom] Room not found:", roomCode);
       return { error: "Room not found" };
     }
 
     const room = result.room;
+    console.log("📊 [joinGameRoom] Current players:", room.game_state.players.length);
 
     // Check if room is full
     if (room.game_state.players.length >= 4) {
@@ -229,10 +233,14 @@ export async function joinGameRoom(
       players: [...room.game_state.players, newPlayer],
     };
 
+    console.log("👥 [joinGameRoom] Updated players:", updatedGameState.players.length);
+    console.log("🔄 [joinGameRoom] Updating room:", roomCode);
+
     // Update room in database
     const updateResult = await updateGameRoom(roomCode, updatedGameState);
 
     if (updateResult.error) {
+      console.error("❌ [joinGameRoom] Failed to update:", updateResult.error);
       return { error: updateResult.error };
     }
 
@@ -240,7 +248,9 @@ export async function joinGameRoom(
       "✅ [joinGameRoom] Player",
       nextPlayerId,
       "joined room",
-      roomCode
+      roomCode,
+      "- Total players:",
+      updatedGameState.players.length
     );
 
     return { success: true, playerId: nextPlayerId };
