@@ -123,7 +123,7 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
       {!isMyTurn && gameState.winner === null && (
         <div className="absolute top-4 right-4 bg-yellow-900/90 border border-yellow-600 rounded-lg p-3 z-10">
           <p className="text-yellow-200 text-sm">
-            ⚠️ Not your turn - moves won't sync
+            ⚠️ Not your turn - moves won&apos;t sync
           </p>
         </div>
       )}
