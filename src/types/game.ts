@@ -99,15 +99,15 @@ export interface GameRoom {
   /** Current room status */
   status: RoomStatus;
   /** Player ID of the room host */
-  hostPlayerId: number;
+  host_player_id: number;
   /** Player ID whose turn it currently is */
-  currentPlayerId: number;
+  current_player_id: number;
   /** Serialized game state (stored as JSONB) */
-  gameState: GameSnapshot;
+  game_state: GameSnapshot;
   /** Room creation timestamp */
-  createdAt: Date;
+  created_at: string;
   /** Last update timestamp */
-  updatedAt: Date;
+  updated_at: string;
 }
 
 // ============================================================================
