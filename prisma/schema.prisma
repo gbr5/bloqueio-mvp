@@ -1,0 +1,103 @@
+// Bloqueio Game - Prisma Schema
+// Phase 1: Core game models without Better Auth (will add in Phase 2)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Room represents a game session
+model Room {
+  id          String     @id @default(cuid())
+  code        String     @unique // 6-character code (R7IAG2)
+  status      RoomStatus @default(WAITING)
+  hostId      String? // Session ID of player who created the room
+  currentTurn Int        @default(0) // Current player ID (0-3)
+  winner      Int? // Winning player ID
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  players  Player[]
+  barriers Barrier[]
+  moves    Move[] // Move history for undo
+
+  @@index([code])
+  @@index([status])
+}
+
+enum RoomStatus {
+  WAITING // Lobby - players joining
+  PLAYING // Game in progress
+  FINISHED // Game over
+}
+
+// Player in a specific room
+model Player {
+  id        String @id @default(cuid())
+  roomId    String
+  room      Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sessionId String // Server-generated session ID from cookies
+  playerId  Int // 0-3 (position in game)
+  name      String // Player's name
+  color     String // "#ef4444", "#3b82f6", etc.
+
+  // Game position - CORRECTED starting positions (first cell AFTER border)
+  row       Int // Current row position
+  col       Int // Current column position
+  wallsLeft Int      @default(6)
+  goalSide  GoalSide
+
+  joinedAt   DateTime @default(now())
+  lastActive DateTime @updatedAt
+
+  @@unique([roomId, sessionId]) // One player per session per room
+  @@unique([roomId, playerId]) // Each slot 0-3 is unique per room
+  @@index([sessionId])
+}
+
+enum GoalSide {
+  TOP
+  RIGHT
+  BOTTOM
+  LEFT
+}
+
+// Barrier placed on the board
+model Barrier {
+  id          String             @id @default(cuid())
+  roomId      String
+  room        Room               @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  row         Int // Base row (top-left of 2x2 area)
+  col         Int // Base column
+  orientation BarrierOrientation
+  placedBy    Int // Player ID who placed it
+  createdAt   DateTime           @default(now())
+
+  @@index([roomId])
+}
+
+enum BarrierOrientation {
+  HORIZONTAL
+  VERTICAL
+}
+
+// Move history (for undo feature)
+model Move {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  playerId  Int // Player who made the move
+  fromRow   Int
+  fromCol   Int
+  toRow     Int
+  toCol     Int
+  createdAt DateTime @default(now())
+
+  @@index([roomId])
+  @@index([createdAt])
+}

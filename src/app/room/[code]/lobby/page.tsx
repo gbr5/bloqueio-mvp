@@ -13,7 +13,11 @@ import { redirect } from "next/navigation";
 
 interface PageProps {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ isHost?: string; autoJoin?: string; playerId?: string }>;
+  searchParams: Promise<{
+    isHost?: string;
+    autoJoin?: string;
+    playerId?: string;
+  }>;
 }
 
 export default async function LobbyPage({ params, searchParams }: PageProps) {
@@ -35,15 +39,17 @@ export default async function LobbyPage({ params, searchParams }: PageProps) {
   // If autoJoin is not set and isHost is not true, we should join them
   // BUT only if they don't already have a playerId in the room
   if (isHost !== "true" && autoJoin !== "false") {
-    console.log("🔄 [Lobby Page] Direct URL access detected, checking if already joined...");
+    console.log(
+      "🔄 [Lobby Page] Direct URL access detected, checking if already joined..."
+    );
 
     // Check if already have playerId from URL params or cookies
     // (Server-side can't access localStorage, so we rely on URL params)
     const existingPlayerId = (await searchParams).playerId;
-    
+
     if (!existingPlayerId) {
       console.log("🔄 [Lobby Page] No existing playerId, auto-joining...");
-      
+
       // Try to join the room
       const joinResult = await joinGameRoom(code);
 
@@ -52,14 +58,21 @@ export default async function LobbyPage({ params, searchParams }: PageProps) {
         // If room is full or game started, just let them spectate
         // (we'll handle this in the UI)
       } else {
-        console.log("✅ [Lobby Page] Auto-joined as player", joinResult.playerId);
+        console.log(
+          "✅ [Lobby Page] Auto-joined as player",
+          joinResult.playerId
+        );
         // Redirect with autoJoin=false to prevent infinite loop
         redirect(
           `/room/${code}/lobby?isHost=false&autoJoin=false&playerId=${joinResult.playerId}`
         );
       }
     } else {
-      console.log("✅ [Lobby Page] Already have playerId:", existingPlayerId, "- skipping auto-join");
+      console.log(
+        "✅ [Lobby Page] Already have playerId:",
+        existingPlayerId,
+        "- skipping auto-join"
+      );
     }
   }
 
