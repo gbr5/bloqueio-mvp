@@ -28,16 +28,19 @@ Phase 6 implements true multiplayer functionality by making the game board sync 
 ### Issues Being Addressed
 
 **Issue #1: Direct URL Access Not Adding Players** ✅
+
 - **Problem:** Copying room URL and pasting in browser didn't add new user to game
 - **Solution:** Auto-join logic in lobby page server component
 - **Status:** Fixed in commit c41f343
 
 **Issue #2: Single User Can Play for All Players** 🔄
+
 - **Problem:** Any player can click any pawn and make moves
 - **Solution:** Turn validation - only current player can interact
 - **Status:** In Progress
 
 **Issue #3: Moves Not Syncing Across Players** 🔄
+
 - **Problem:** When one user moves, other players don't see it
 - **Solution:** Make game controlled + sync to database + polling updates
 - **Status:** In Progress
@@ -104,6 +107,7 @@ Phase 6 implements true multiplayer functionality by making the game board sync 
 **Goal:** Users who paste room link should auto-join the game
 
 **Files Modified:**
+
 - `src/app/room/[code]/lobby/page.tsx`
 - `src/components/WaitingLobby.tsx`
 - `src/lib/actions/game-room.ts`
@@ -120,7 +124,9 @@ export default async function LobbyPage({ params, searchParams }) {
   if (isHost !== "true" && autoJoin !== "false") {
     const joinResult = await joinGameRoom(code);
     if (!joinResult.error) {
-      redirect(`/room/${code}/lobby?isHost=false&autoJoin=false&playerId=${joinResult.playerId}`);
+      redirect(
+        `/room/${code}/lobby?isHost=false&autoJoin=false&playerId=${joinResult.playerId}`
+      );
     }
   }
   // ... rest of code
@@ -136,6 +142,7 @@ useEffect(() => {
 ```
 
 **Testing:**
+
 - ✅ Create room
 - ✅ Copy room link
 - ✅ Paste in incognito browser
@@ -151,13 +158,14 @@ useEffect(() => {
 **Goal:** Convert 1100-line local game to accept external state and callbacks
 
 **Current Problem:**
+
 ```typescript
 // game.tsx - ALL state is internal
 function BloqueioPage() {
   const [players, setPlayers] = useState(createInitialPlayers());
   const [blockedEdges, setBlockedEdges] = useState([]);
   // ... 50+ lines of state
-  
+
   // Moves only update local state - no sync!
   function handleCellClick(row, col) {
     setPlayers(newPlayers); // ❌ Local only
@@ -166,6 +174,7 @@ function BloqueioPage() {
 ```
 
 **Target Solution:**
+
 ```typescript
 // game.tsx - Controlled component
 interface BloqueioPageProps {
@@ -175,30 +184,32 @@ interface BloqueioPageProps {
   disabled?: boolean; // Not your turn
 }
 
-function BloqueioPage({ 
-  gameState, 
-  onGameStateChange, 
+function BloqueioPage({
+  gameState,
+  onGameStateChange,
   myPlayerId,
-  disabled 
+  disabled,
 }: BloqueioPageProps) {
   // Use props instead of local state
   const players = gameState.players;
   const blockedEdges = gameState.blockedEdges;
-  
+
   function handleCellClick(row, col) {
     if (disabled) return; // ✅ Turn validation
-    
-    const newState = { ...gameState, /* updates */ };
+
+    const newState = { ...gameState /* updates */ };
     onGameStateChange(newState); // ✅ Callback to parent
   }
 }
 ```
 
 **Files to Modify:**
+
 - `src/app/game.tsx` (make controlled)
 - `src/components/GameBoard.tsx` (connect props)
 
 **Acceptance Criteria:**
+
 - [ ] BloqueioPage accepts `gameState` prop
 - [ ] BloqueioPage calls `onGameStateChange` callback
 - [ ] No internal state management (use props)
@@ -236,7 +247,7 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
   const handleGameStateChange = async (newState: GameSnapshot) => {
     // Optimistic update
     setGameState(newState);
-    
+
     // Sync to database
     await updateGameRoom(roomCode, newState);
   };
@@ -257,6 +268,7 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
 ```
 
 **Acceptance Criteria:**
+
 - [ ] GameBoard passes state to BloqueioPage
 - [ ] Moves sync to database via `updateGameRoom`
 - [ ] Polling updates state from database
@@ -283,16 +295,19 @@ function handleCellClick(row, col) {
 }
 
 // Add visual overlay when disabled
-{disabled && (
-  <div className="absolute inset-0 bg-black/30 cursor-not-allowed z-40">
-    <div className="text-center mt-20 text-white text-2xl">
-      Waiting for your turn...
+{
+  disabled && (
+    <div className="absolute inset-0 bg-black/30 cursor-not-allowed z-40">
+      <div className="text-center mt-20 text-white text-2xl">
+        Waiting for your turn...
+      </div>
     </div>
-  </div>
-)}
+  );
+}
 ```
 
 **Acceptance Criteria:**
+
 - [ ] Visual indicator when not your turn
 - [ ] Clicks disabled when not your turn
 - [ ] Clear message: "Waiting for Player X"
@@ -305,6 +320,7 @@ function handleCellClick(row, col) {
 **Test Cases:**
 
 1. **Two Browser Test**
+
    - [ ] Create room in Browser A
    - [ ] Join in Browser B (incognito)
    - [ ] Start game
@@ -313,6 +329,7 @@ function handleCellClick(row, col) {
    - [ ] Player 2's turn → Player 1 sees move
 
 2. **Three Player Test**
+
    - [ ] 3 players join
    - [ ] Turn rotation works correctly (P1 → P2 → P3 → P1)
    - [ ] All players see all moves
@@ -325,6 +342,7 @@ function handleCellClick(row, col) {
    - [ ] Winner detected → All players see game over modal
 
 **Debugging Tools:**
+
 - [ ] Console logs for all state changes
 - [ ] Network tab to verify polling
 - [ ] Neon console to check database updates
@@ -374,11 +392,13 @@ If multiplayer sync breaks the game:
 ### Day 1 (December 15, 2025)
 
 **Completed:**
+
 - ✅ Task 1: Fixed direct URL access (commit c41f343)
 - ✅ Created feature branch: `feature/real-multiplayer-sync`
 - ✅ Documented architecture and approach
 
 **In Progress:**
+
 - 🔄 Task 2: Making BloqueioPage controlled
 
 **Blockers:** None
@@ -401,12 +421,14 @@ If multiplayer sync breaks the game:
 ## 🎯 Next Steps After Phase 6
 
 **If Multiplayer Works:**
+
 1. Deploy to production
 2. Test with 10-15 real users
 3. Collect feedback
 4. Decide: monetization vs more features
 
 **If Issues Found:**
+
 1. Document bugs
 2. Prioritize critical vs nice-to-have
 3. Fix critical first

@@ -1,6 +1,6 @@
 "use client";
 
-import { JSX, useState } from "react";
+import { JSX, useState, useEffect } from "react";
 import type {
   PlayerId,
   GoalSide,
@@ -12,6 +12,19 @@ import type {
   GameSnapshot,
 } from "@/types/game";
 import { PLAYER_BASE_COLORS } from "@/types/game";
+
+/**
+ * Props for controlled BloqueioPage component
+ * 
+ * For multiplayer: pass gameState and onGameStateChange
+ * For local play: omit props to use internal state
+ */
+interface BloqueioPageProps {
+  gameState?: GameSnapshot;
+  onGameStateChange?: (newState: GameSnapshot) => void;
+  myPlayerId?: number | null;
+  disabled?: boolean;
+}
 
 // Tabuleiro original interno é 9x9, com uma borda extra em volta
 const INNER_SIZE = 9;
@@ -186,22 +199,65 @@ function canPawnMoveTo(
   return true;
 }
 
-export default function BloqueioPage() {
-  const [players, setPlayers] = useState<Player[]>(() =>
+export default function BloqueioPage({
+  gameState: externalGameState,
+  onGameStateChange,
+  myPlayerId,
+  disabled = false,
+}: BloqueioPageProps = {}) {
+  // Internal state for local-only play (when no props provided)
+  const [localPlayers, setLocalPlayers] = useState<Player[]>(() =>
     createInitialPlayers()
   );
-  const [blockedEdges, setBlockedEdges] = useState<Set<string>>(
+  const [localBlockedEdges, setLocalBlockedEdges] = useState<Set<string>>(
     () => new Set()
   );
-  const [barriers, setBarriers] = useState<Barrier[]>([]);
-  const [currentPlayerId, setCurrentPlayerId] = useState<PlayerId>(0);
+  const [localBarriers, setLocalBarriers] = useState<Barrier[]>([]);
+  const [localCurrentPlayerId, setLocalCurrentPlayerId] = useState<PlayerId>(0);
+  const [localWinner, setLocalWinner] = useState<PlayerId | null>(null);
+
+  // Determine if we're in controlled mode (multiplayer) or uncontrolled (local)
+  const isControlled = externalGameState !== undefined && onGameStateChange !== undefined;
+
+  // Use external state if controlled, otherwise use local state
+  const players = isControlled ? externalGameState.players : localPlayers;
+  const blockedEdges = isControlled 
+    ? new Set(externalGameState.blockedEdges) 
+    : localBlockedEdges;
+  const barriers = isControlled ? externalGameState.barriers : localBarriers;
+  const currentPlayerId = isControlled ? externalGameState.currentPlayerId : localCurrentPlayerId;
+  const winner = isControlled ? externalGameState.winner : localWinner;
+
+  // UI-only state (not synced)
   const [mode, setMode] = useState<Mode>("move");
-  const [winner, setWinner] = useState<PlayerId | null>(null);
   const [history, setHistory] = useState<GameSnapshot[]>([]);
   const [wallOrientation, setWallOrientation] = useState<Orientation>("H");
   const [hoveredCell, setHoveredCell] = useState<Cell | null>(null);
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId)!;
+
+  // Helper to update game state (works for both controlled and uncontrolled)
+  function updateGameState(updates: Partial<GameSnapshot>) {
+    const newState: GameSnapshot = {
+      players: updates.players ?? players,
+      blockedEdges: updates.blockedEdges ?? Array.from(blockedEdges),
+      barriers: updates.barriers ?? barriers,
+      currentPlayerId: updates.currentPlayerId ?? currentPlayerId,
+      winner: updates.winner ?? winner,
+    };
+
+    if (isControlled) {
+      // Multiplayer: call parent callback
+      onGameStateChange!(newState);
+    } else {
+      // Local: update local state
+      if (updates.players) setLocalPlayers(updates.players);
+      if (updates.blockedEdges) setLocalBlockedEdges(new Set(updates.blockedEdges));
+      if (updates.barriers) setLocalBarriers(updates.barriers);
+      if (updates.currentPlayerId !== undefined) setLocalCurrentPlayerId(updates.currentPlayerId);
+      if (updates.winner !== undefined) setLocalWinner(updates.winner);
+    }
+  }
 
   function nextPlayerId(id: PlayerId): PlayerId {
     return ((id + 1) % 4) as PlayerId;
@@ -225,16 +281,19 @@ export default function BloqueioPage() {
   }
 
   function handleUndo() {
+    // Undo is only available in local (single-player) mode
+    if (isControlled) return;
+
     setHistory((prev) => {
       if (prev.length === 0) return prev;
 
       const last = prev[prev.length - 1];
 
-      setPlayers(last.players.map((p) => ({ ...p })));
-      setBlockedEdges(new Set(last.blockedEdges));
-      setBarriers(last.barriers.map((b) => ({ ...b })));
-      setCurrentPlayerId(last.currentPlayerId);
-      setWinner(last.winner);
+      setLocalPlayers(last.players.map((p) => ({ ...p })));
+      setLocalBlockedEdges(new Set(last.blockedEdges));
+      setLocalBarriers(last.barriers.map((b) => ({ ...b })));
+      setLocalCurrentPlayerId(last.currentPlayerId);
+      setLocalWinner(last.winner);
       setMode("move");
       setHoveredCell(null);
 
@@ -381,6 +440,12 @@ export default function BloqueioPage() {
   }
 
   function handleCellClick(row: number, col: number) {
+    // Turn validation for multiplayer
+    if (disabled) {
+      console.log("🚫 Not your turn!");
+      return;
+    }
+    
     if (winner !== null) return;
     if (mode === "move") {
       handleMove(row, col);
@@ -395,16 +460,17 @@ export default function BloqueioPage() {
     const cur = currentPlayer;
     pushSnapshot();
 
-    setPlayers((prev) =>
-      prev.map((p) => (p.id === cur.id ? { ...p, row, col } : p))
+    const newPlayers = players.map((p) => 
+      p.id === cur.id ? { ...p, row, col } : p
     );
 
-    if (isGoal(row, col, cur.goalSide)) {
-      setWinner(cur.id);
-      return;
-    }
-
-    setCurrentPlayerId((prev) => nextPlayerId(prev));
+    const isWinningMove = isGoal(row, col, cur.goalSide);
+    
+    updateGameState({
+      players: newPlayers,
+      currentPlayerId: isWinningMove ? currentPlayerId : nextPlayerId(currentPlayerId),
+      winner: isWinningMove ? cur.id : winner,
+    });
   }
 
   function handleWallClick(row: number, col: number) {
@@ -417,33 +483,39 @@ export default function BloqueioPage() {
 
     const newBlocked = new Set(blockedEdges);
     edgesToAdd.forEach((e) => newBlocked.add(e));
-    setBlockedEdges(newBlocked);
 
-    setBarriers((prev) => [
-      ...prev,
-      {
-        row: baseRow,
-        col: baseCol,
-        orientation,
-        id: `${baseRow}-${baseCol}-${orientation}-${Date.now()}-${Math.random()}`,
-      },
-    ]);
+    const newBarrier: Barrier = {
+      row: baseRow,
+      col: baseCol,
+      orientation,
+      id: `${baseRow}-${baseCol}-${orientation}-${Date.now()}-${Math.random()}`,
+    };
 
-    setPlayers((prev) =>
-      prev.map((p) =>
-        p.id === currentPlayer.id ? { ...p, wallsLeft: p.wallsLeft - 1 } : p
-      )
+    const newPlayers = players.map((p) =>
+      p.id === currentPlayer.id ? { ...p, wallsLeft: p.wallsLeft - 1 } : p
     );
-    setCurrentPlayerId((prev) => nextPlayerId(prev));
+
+    updateGameState({
+      players: newPlayers,
+      blockedEdges: Array.from(newBlocked),
+      barriers: [...barriers, newBarrier],
+      currentPlayerId: nextPlayerId(currentPlayerId),
+    });
   }
 
   function handleRestart() {
-    setPlayers(createInitialPlayers());
-    setBlockedEdges(new Set());
-    setBarriers([]);
-    setCurrentPlayerId(0);
+    // For controlled mode, don't allow restart (handle in parent)
+    if (isControlled) {
+      console.log("⚠️ Restart not available in multiplayer mode");
+      return;
+    }
+
+    setLocalPlayers(createInitialPlayers());
+    setLocalBlockedEdges(new Set());
+    setLocalBarriers([]);
+    setLocalCurrentPlayerId(0);
     setMode("move");
-    setWinner(null);
+    setLocalWinner(null);
     setHistory([]);
     setHoveredCell(null);
   }
@@ -725,6 +797,37 @@ export default function BloqueioPage() {
               {barrierOverlays}
               {ghostBarrier}
 
+              {/* Turn validation overlay - show when it's not the player's turn in multiplayer */}
+              {disabled && (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "rgba(0, 0, 0, 0.6)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 1000,
+                    pointerEvents: "none",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "1rem 1.5rem",
+                      background: "rgba(15, 23, 42, 0.95)",
+                      border: "2px solid #1f2937",
+                      borderRadius: "0.75rem",
+                      color: "#e5e7eb",
+                      fontSize: "1rem",
+                      fontWeight: 600,
+                      textAlign: "center",
+                    }}
+                  >
+                    Aguardando {currentPlayer.name}...
+                  </div>
+                </div>
+              )}
+
               {/* Colunas A–I (cima/baixo) mapeadas para colunas internas 1..SIZE-2 */}
               {COL_LABELS.map((label, idx) => {
                 const colIndex = idx + 1; // interno
@@ -886,40 +989,44 @@ export default function BloqueioPage() {
                 >
                   Colocar barreira
                 </button>
-                <button
-                  type="button"
-                  onClick={handleUndo}
-                  disabled={history.length === 0}
-                  style={{
-                    padding: "0.4rem 0.8rem",
-                    borderRadius: 999,
-                    border: "1px solid #1f2937",
-                    background:
-                      history.length === 0
-                        ? "rgba(15,23,42,0.5)"
-                        : "rgba(15,23,42,0.9)",
-                    color: history.length === 0 ? "#4b5563" : "#e5e7eb",
-                    fontSize: "0.85rem",
-                    cursor: history.length === 0 ? "not-allowed" : "pointer",
-                  }}
-                >
-                  Desfazer
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRestart}
-                  style={{
-                    padding: "0.4rem 0.8rem",
-                    borderRadius: 999,
-                    border: "1px solid #1f2937",
-                    background: "rgba(15,23,42,0.9)",
-                    color: "#e5e7eb",
-                    fontSize: "0.85rem",
-                    cursor: "pointer",
-                  }}
-                >
-                  Reiniciar
-                </button>
+                {!isControlled && (
+                  <button
+                    type="button"
+                    onClick={handleUndo}
+                    disabled={history.length === 0}
+                    style={{
+                      padding: "0.4rem 0.8rem",
+                      borderRadius: 999,
+                      border: "1px solid #1f2937",
+                      background:
+                        history.length === 0
+                          ? "rgba(15,23,42,0.5)"
+                          : "rgba(15,23,42,0.9)",
+                      color: history.length === 0 ? "#4b5563" : "#e5e7eb",
+                      fontSize: "0.85rem",
+                      cursor: history.length === 0 ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    Desfazer
+                  </button>
+                )}
+                {!isControlled && (
+                  <button
+                    type="button"
+                    onClick={handleRestart}
+                    style={{
+                      padding: "0.4rem 0.8rem",
+                      borderRadius: 999,
+                      border: "1px solid #1f2937",
+                      background: "rgba(15,23,42,0.9)",
+                      color: "#e5e7eb",
+                      fontSize: "0.85rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Reiniciar
+                  </button>
+                )}
               </div>
 
               {mode === "wall" && (
