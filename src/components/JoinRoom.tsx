@@ -106,9 +106,9 @@ export function JoinRoom({ onCancel }: JoinRoomProps) {
         joinResult.playerId
       );
 
-      // Store player ID in localStorage
+      // Store player ID in sessionStorage (tab-specific, not shared across tabs)
       if (joinResult.playerId !== undefined) {
-        localStorage.setItem(
+        sessionStorage.setItem(
           `room_${roomCode}_playerId`,
           joinResult.playerId.toString()
         );

@@ -15,7 +15,7 @@ import { PLAYER_BASE_COLORS } from "@/types/game";
 
 /**
  * Props for controlled BloqueioPage component
- * 
+ *
  * For multiplayer: pass gameState and onGameStateChange
  * For local play: omit props to use internal state
  */
@@ -217,15 +217,18 @@ export default function BloqueioPage({
   const [localWinner, setLocalWinner] = useState<PlayerId | null>(null);
 
   // Determine if we're in controlled mode (multiplayer) or uncontrolled (local)
-  const isControlled = externalGameState !== undefined && onGameStateChange !== undefined;
+  const isControlled =
+    externalGameState !== undefined && onGameStateChange !== undefined;
 
   // Use external state if controlled, otherwise use local state
   const players = isControlled ? externalGameState.players : localPlayers;
-  const blockedEdges = isControlled 
-    ? new Set(externalGameState.blockedEdges) 
+  const blockedEdges = isControlled
+    ? new Set(externalGameState.blockedEdges)
     : localBlockedEdges;
   const barriers = isControlled ? externalGameState.barriers : localBarriers;
-  const currentPlayerId = isControlled ? externalGameState.currentPlayerId : localCurrentPlayerId;
+  const currentPlayerId = isControlled
+    ? externalGameState.currentPlayerId
+    : localCurrentPlayerId;
   const winner = isControlled ? externalGameState.winner : localWinner;
 
   // UI-only state (not synced)
@@ -252,9 +255,11 @@ export default function BloqueioPage({
     } else {
       // Local: update local state
       if (updates.players) setLocalPlayers(updates.players);
-      if (updates.blockedEdges) setLocalBlockedEdges(new Set(updates.blockedEdges));
+      if (updates.blockedEdges)
+        setLocalBlockedEdges(new Set(updates.blockedEdges));
       if (updates.barriers) setLocalBarriers(updates.barriers);
-      if (updates.currentPlayerId !== undefined) setLocalCurrentPlayerId(updates.currentPlayerId);
+      if (updates.currentPlayerId !== undefined)
+        setLocalCurrentPlayerId(updates.currentPlayerId);
       if (updates.winner !== undefined) setLocalWinner(updates.winner);
     }
   }
@@ -445,7 +450,7 @@ export default function BloqueioPage({
       console.log("🚫 Not your turn!");
       return;
     }
-    
+
     if (winner !== null) return;
     if (mode === "move") {
       handleMove(row, col);
@@ -460,15 +465,17 @@ export default function BloqueioPage({
     const cur = currentPlayer;
     pushSnapshot();
 
-    const newPlayers = players.map((p) => 
+    const newPlayers = players.map((p) =>
       p.id === cur.id ? { ...p, row, col } : p
     );
 
     const isWinningMove = isGoal(row, col, cur.goalSide);
-    
+
     updateGameState({
       players: newPlayers,
-      currentPlayerId: isWinningMove ? currentPlayerId : nextPlayerId(currentPlayerId),
+      currentPlayerId: isWinningMove
+        ? currentPlayerId
+        : nextPlayerId(currentPlayerId),
       winner: isWinningMove ? cur.id : winner,
     });
   }
@@ -534,18 +541,22 @@ export default function BloqueioPage({
       let background = "#020617";
       const borderColor = "#1f2937";
 
-      // bases nas bordas externas (como você ajustou)
+      // Goal zones: show player color on OPPOSITE border (where they're trying to reach)
+      // Player 0 (RED) starts at LEFT (col=0), goal is RIGHT (col=SIZE-1)
+      // Player 1 (BLUE) starts at TOP (row=0), goal is BOTTOM (row=SIZE-1)
+      // Player 2 (GREEN) starts at RIGHT (col=SIZE-1), goal is LEFT (col=0)
+      // Player 3 (YELLOW) starts at BOTTOM (row=SIZE-1), goal is TOP (row=0)
       if (row === 0) {
-        background = PLAYER_BASE_COLORS[0];
+        background = PLAYER_BASE_COLORS[3]; // Yellow's goal (starts at BOTTOM)
       }
       if (row === SIZE - 1) {
-        background = PLAYER_BASE_COLORS[2];
+        background = PLAYER_BASE_COLORS[1]; // Blue's goal (starts at TOP)
       }
       if (col === 0) {
-        background = PLAYER_BASE_COLORS[3];
+        background = PLAYER_BASE_COLORS[2]; // Green's goal (starts at RIGHT)
       }
       if (col === SIZE - 1) {
-        background = PLAYER_BASE_COLORS[1];
+        background = PLAYER_BASE_COLORS[0]; // Red's goal (starts at LEFT)
       }
 
       // hover de jogada válida
@@ -796,37 +807,6 @@ export default function BloqueioPage({
 
               {barrierOverlays}
               {ghostBarrier}
-
-              {/* Turn validation overlay - show when it's not the player's turn in multiplayer */}
-              {disabled && (
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: "rgba(0, 0, 0, 0.6)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    zIndex: 1000,
-                    pointerEvents: "none",
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "1rem 1.5rem",
-                      background: "rgba(15, 23, 42, 0.95)",
-                      border: "2px solid #1f2937",
-                      borderRadius: "0.75rem",
-                      color: "#e5e7eb",
-                      fontSize: "1rem",
-                      fontWeight: 600,
-                      textAlign: "center",
-                    }}
-                  >
-                    Aguardando {currentPlayer.name}...
-                  </div>
-                </div>
-              )}
 
               {/* Colunas A–I (cima/baixo) mapeadas para colunas internas 1..SIZE-2 */}
               {COL_LABELS.map((label, idx) => {
@@ -1119,7 +1099,6 @@ export default function BloqueioPage({
                       alignItems: "center",
                       gap: "0.5rem",
                       fontSize: "0.85rem",
-                      opacity: winner !== null && winner !== p.id ? 0.5 : 1,
                     }}
                   >
                     <span

@@ -84,8 +84,7 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
 
   const handleContinue = () => {
     if (roomCode) {
-      // Store player ID in localStorage (host is always player 0)
-      localStorage.setItem(`room_${roomCode}_playerId`, "0");
+      // Store player ID in sessionStorage (tab-specific, not shared across tabs)\n      sessionStorage.setItem(`room_${roomCode}_playerId`, "0");
 
       // Navigate to lobby with isHost=true query param
       router.push(`/room/${roomCode}/lobby?isHost=true`);

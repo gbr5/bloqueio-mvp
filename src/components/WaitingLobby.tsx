@@ -33,11 +33,11 @@ export function WaitingLobby({
   const [copiedLink, setCopiedLink] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Store player ID in localStorage if provided in URL (from auto-join)
+  // Store player ID in sessionStorage if provided in URL (from auto-join)
   useEffect(() => {
     const playerIdFromUrl = searchParams.get("playerId");
     if (playerIdFromUrl) {
-      localStorage.setItem(`room_${roomCode}_playerId`, playerIdFromUrl);
+      sessionStorage.setItem(`room_${roomCode}_playerId`, playerIdFromUrl);
       console.log(
         "💾 [WaitingLobby] Stored player ID from URL:",
         playerIdFromUrl

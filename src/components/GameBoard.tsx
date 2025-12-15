@@ -29,11 +29,12 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
   const [showGameOver, setShowGameOver] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
 
-  // Get player ID from localStorage (set during join/create)
+  // Get player ID from sessionStorage (set during join/create)
+  // Using sessionStorage instead of localStorage so each browser tab has its own player ID
   // Using initializer function to avoid setState in useEffect
   const [myPlayerId] = useState<number | null>(() => {
     if (typeof window === "undefined") return null;
-    const storedPlayerId = localStorage.getItem(`room_${roomCode}_playerId`);
+    const storedPlayerId = sessionStorage.getItem(`room_${roomCode}_playerId`);
     return storedPlayerId ? parseInt(storedPlayerId, 10) : null;
   });
 
