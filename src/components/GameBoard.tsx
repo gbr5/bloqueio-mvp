@@ -67,15 +67,13 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
     return () => clearInterval(pollInterval);
   }, [roomCode, router, showGameOver]);
 
-  // Sync moves to database (Task 5)
-  // NOTE: Not used yet - BloqueioPage is still local-only for MVP
-  // This function will be called when we make BloqueioPage a controlled component
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // Sync moves to database
+  // Called when the controlled BloqueioPage makes a move
   const handleGameStateChange = async (newState: GameSnapshot) => {
-    // Optimistic update
+    // Optimistic update - update UI immediately for better UX
     setGameState(newState);
 
-    // Sync to database
+    // Sync to database - other players will see this on their next poll
     try {
       const result = await updateGameRoom(roomCode, newState);
       if (result.error) {
@@ -189,17 +187,13 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
         </div>
       </div>
 
-      {/* Multiplayer notice */}
-      {!isMyTurn && gameState.winner === null && (
-        <div className="absolute top-16 right-4 bg-yellow-900/90 border border-yellow-600 rounded-lg p-3 z-10">
-          <p className="text-yellow-200 text-sm">
-            ⚠️ Not your turn - moves won&apos;t sync
-          </p>
-        </div>
-      )}
-
-      {/* Game board - currently local only */}
-      <BloqueioPage />
+      {/* Game board - now controlled for multiplayer sync */}
+      <BloqueioPage
+        gameState={gameState}
+        onGameStateChange={handleGameStateChange}
+        myPlayerId={myPlayerId}
+        disabled={!isMyTurn || gameState.winner !== null}
+      />
 
       {/* Game Over Modal */}
       {showGameOver && gameState.winner !== null && (
@@ -285,9 +279,6 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
           </div>
         </div>
       )}
-
-      {/* Note: Game is local-only for now */}
-      {/* TODO: Make BloqueioPage controlled to sync moves */}
     </div>
   );
 }
