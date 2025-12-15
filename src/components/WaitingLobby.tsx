@@ -11,7 +11,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { loadGameRoom, startGame } from "@/lib/actions/game-room";
 import type { GameRoom } from "@/types/game";
 
@@ -27,10 +27,23 @@ export function WaitingLobby({
   initialRoom,
 }: WaitingLobbyProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [room, setRoom] = useState<GameRoom>(initialRoom);
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Store player ID in localStorage if provided in URL (from auto-join)
+  useEffect(() => {
+    const playerIdFromUrl = searchParams.get("playerId");
+    if (playerIdFromUrl) {
+      localStorage.setItem(`room_${roomCode}_playerId`, playerIdFromUrl);
+      console.log(
+        "💾 [WaitingLobby] Stored player ID from URL:",
+        playerIdFromUrl
+      );
+    }
+  }, [roomCode, searchParams]);
 
   // Poll for room updates every 2 seconds
   useEffect(() => {

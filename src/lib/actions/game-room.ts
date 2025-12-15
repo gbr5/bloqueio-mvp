@@ -151,7 +151,7 @@ export async function joinGameRoom(
 ): Promise<{ success?: boolean; playerId?: number; error?: string }> {
   try {
     console.log("🚪 [joinGameRoom] Attempting to join room:", roomCode);
-    
+
     // Load current room state
     const result = await loadGameRoom(roomCode);
 
@@ -161,7 +161,10 @@ export async function joinGameRoom(
     }
 
     const room = result.room;
-    console.log("📊 [joinGameRoom] Current players:", room.game_state.players.length);
+    console.log(
+      "📊 [joinGameRoom] Current players:",
+      room.game_state.players.length
+    );
 
     // Check if room is full
     if (room.game_state.players.length >= 4) {
@@ -233,7 +236,10 @@ export async function joinGameRoom(
       players: [...room.game_state.players, newPlayer],
     };
 
-    console.log("👥 [joinGameRoom] Updated players:", updatedGameState.players.length);
+    console.log(
+      "👥 [joinGameRoom] Updated players:",
+      updatedGameState.players.length
+    );
     console.log("🔄 [joinGameRoom] Updating room:", roomCode);
 
     // Update room in database
