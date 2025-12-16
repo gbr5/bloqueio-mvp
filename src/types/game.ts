@@ -67,6 +67,8 @@ export interface Barrier {
   orientation: Orientation;
   /** Unique identifier for this barrier */
   id: string;
+  /** Player ID who placed this barrier (optional for backwards compatibility) */
+  placedBy?: PlayerId;
 }
 
 // ============================================================================

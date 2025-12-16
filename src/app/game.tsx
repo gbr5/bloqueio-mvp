@@ -710,6 +710,7 @@ export default function BloqueioPage({
       col: baseCol,
       orientation,
       id: `${baseRow}-${baseCol}-${orientation}-${Date.now()}-${Math.random()}`,
+      placedBy: currentPlayer.id,
     };
 
     const newPlayers = players.map((p) =>
@@ -865,6 +866,24 @@ export default function BloqueioPage({
   function renderBarrier(b: Barrier, opts?: { ghost?: boolean }): JSX.Element {
     const ghost = opts?.ghost ?? false;
 
+    // Get the color of the player who placed the barrier
+    // For ghost barriers, use current player's color
+    // For placed barriers, use the placedBy player's color (fallback to yellow for old barriers)
+    let barrierColor: string;
+    if (ghost) {
+      barrierColor = currentPlayer.color;
+    } else if (b.placedBy !== undefined) {
+      const placer = players.find((p) => p.id === b.placedBy);
+      barrierColor = placer?.color ?? "#facc15";
+    } else {
+      barrierColor = "#facc15"; // Default yellow for backwards compatibility
+    }
+
+    // Create rgba version for ghost barriers
+    const ghostColor = barrierColor.startsWith("#")
+      ? `${barrierColor}66` // Add 40% opacity
+      : barrierColor.replace(")", ", 0.4)").replace("rgb", "rgba");
+
     if (b.orientation === "H") {
       const top = (b.row + 1) * cellPercent;
       const left = (b.col + 1) * cellPercent;
@@ -878,10 +897,10 @@ export default function BloqueioPage({
             transform: "translate(-50%, -50%)",
             width: `${cellPercent * 2 * 0.9}%`,
             height: 4,
-            background: ghost ? "rgba(250,204,21,0.4)" : "#facc15",
+            background: ghost ? ghostColor : barrierColor,
             boxShadow: ghost
-              ? "0 0 6px rgba(250,204,21,0.5)"
-              : "0 0 10px rgba(250,204,21,0.9)",
+              ? `0 0 6px ${ghostColor}`
+              : `0 0 10px ${barrierColor}`,
             borderRadius: 999,
             pointerEvents: "none",
           }}
@@ -900,10 +919,10 @@ export default function BloqueioPage({
             transform: "translate(-50%, -50%)",
             width: 4,
             height: `${cellPercent * 2 * 0.9}%`,
-            background: ghost ? "rgba(250,204,21,0.4)" : "#facc15",
+            background: ghost ? ghostColor : barrierColor,
             boxShadow: ghost
-              ? "0 0 6px rgba(250,204,21,0.5)"
-              : "0 0 10px rgba(250,204,21,0.9)",
+              ? `0 0 6px ${ghostColor}`
+              : `0 0 10px ${barrierColor}`,
             borderRadius: 999,
             pointerEvents: "none",
           }}

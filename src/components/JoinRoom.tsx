@@ -85,7 +85,10 @@ export function JoinRoom({ onCancel }: JoinRoomProps) {
       }
 
       // Store player ID in sessionStorage
-      sessionStorage.setItem(`room_${roomCode}_playerId`, String(result.playerId));
+      sessionStorage.setItem(
+        `room_${roomCode}_playerId`,
+        String(result.playerId)
+      );
 
       // Navigate to lobby
       router.push(`/room/${roomCode}/lobby`);

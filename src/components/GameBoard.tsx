@@ -13,6 +13,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getRoomState } from "@/lib/actions/room-actions";
 import { makeMove, placeBarrier } from "@/lib/actions/game-actions";
+import { getAdaptiveInterval } from "@/config/polling";
 import type { Player, Barrier, Room } from "@prisma/client";
 import BloqueioPage from "@/app/game";
 import type { GameSnapshot } from "@/types/game";
@@ -58,15 +59,83 @@ export function GameBoard({ roomCode }: GameBoardProps) {
 
     loadRoom(); // Initial load
 
-    // Only poll when it's NOT your turn (waiting for opponent)
-    const interval = setInterval(() => {
-      if (room && myPlayerId !== null && room.currentTurn !== myPlayerId) {
-        loadRoom();
-      }
-    }, 1000);
+    // Adaptive polling - only when it's NOT your turn
+    let intervalId: NodeJS.Timeout | null = null;
 
-    return () => clearInterval(interval);
+    const startPolling = () => {
+      if (intervalId) clearInterval(intervalId);
+
+      // Calculate adaptive interval from config
+      const interval = room
+        ? getAdaptiveInterval(new Date(room.updatedAt).getTime())
+        : 15000; // Default while loading
+
+      console.log("Using polling interval:", interval);
+
+      if (interval === null) {
+        // Room is very idle, stop polling
+        return;
+      }
+
+      intervalId = setInterval(() => {
+        if (room && myPlayerId !== null && room.currentTurn !== myPlayerId) {
+          loadRoom();
+        }
+      }, interval);
+    };
+
+    startPolling();
+
+    // Restart polling when room changes (adjusts interval)
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [roomCode, router, showGameOver, room, myPlayerId]);
+
+  // Helper function to compute blocked edges from barriers
+  const computeBlockedEdges = (barriers: Barrier[]): string[] => {
+    const edges: string[] = [];
+
+    const edgeKey = (r1: number, c1: number, r2: number, c2: number) => {
+      if (r1 > r2 || (r1 === r2 && c1 > c2)) {
+        [r1, r2] = [r2, r1];
+        [c1, c2] = [c2, c1];
+      }
+      return `${r1},${c1}-${r2},${c2}`;
+    };
+
+    for (const barrier of barriers) {
+      if (barrier.orientation === "HORIZONTAL") {
+        // Horizontal barrier blocks 2 edges
+        edges.push(
+          edgeKey(barrier.row, barrier.col, barrier.row + 1, barrier.col)
+        );
+        edges.push(
+          edgeKey(
+            barrier.row,
+            barrier.col + 1,
+            barrier.row + 1,
+            barrier.col + 1
+          )
+        );
+      } else {
+        // Vertical barrier blocks 2 edges
+        edges.push(
+          edgeKey(barrier.row, barrier.col, barrier.row, barrier.col + 1)
+        );
+        edges.push(
+          edgeKey(
+            barrier.row + 1,
+            barrier.col,
+            barrier.row + 1,
+            barrier.col + 1
+          )
+        );
+      }
+    }
+
+    return edges;
+  };
 
   // Convert Prisma models to GameSnapshot format
   const gameState: GameSnapshot | null = room
@@ -85,15 +154,17 @@ export function GameBoard({ roomCode }: GameBoardProps) {
           id: b.id,
           row: b.row,
           col: b.col,
-          orientation: b.orientation === "HORIZONTAL" ? ("H" as const) : ("V" as const),
+          orientation:
+            b.orientation === "HORIZONTAL" ? ("H" as const) : ("V" as const),
+          placedBy: b.placedBy as 0 | 1 | 2 | 3,
         })),
-        blockedEdges: [], // Will compute from barriers in game logic
+        blockedEdges: computeBlockedEdges(room.barriers),
         currentPlayerId: room.currentTurn as 0 | 1 | 2 | 3,
         winner: room.winner as (0 | 1 | 2 | 3) | null,
       }
     : null;
 
-  // Handle moves from BloqueioPage
+  // Handle moves from BloqueioPage with optimistic updates
   const handleGameStateChange = async (newState: GameSnapshot) => {
     if (!room || myPlayerId === null) return;
 
@@ -104,27 +175,78 @@ export function GameBoard({ roomCode }: GameBoardProps) {
 
     // Detect if this is a move or barrier placement
     const movedPosition =
-      currentPlayer.row !== newPlayerState.row || currentPlayer.col !== newPlayerState.col;
+      currentPlayer.row !== newPlayerState.row ||
+      currentPlayer.col !== newPlayerState.col;
     const placedBarrier = newState.barriers.length > room.barriers.length;
 
     if (movedPosition) {
-      // Make move
-      const result = await makeMove(roomCode, newPlayerState.row, newPlayerState.col);
+      // OPTIMISTIC UPDATE: Apply move immediately to UI
+      const optimisticRoom: RoomWithPlayers = {
+        ...room,
+        players: room.players.map((p) =>
+          p.playerId === myPlayerId
+            ? { ...p, row: newPlayerState.row, col: newPlayerState.col }
+            : p
+        ),
+        currentTurn: ((room.currentTurn + 1) % room.players.length) as
+          | 0
+          | 1
+          | 2
+          | 3,
+        updatedAt: new Date(),
+      };
+
+      setRoom(optimisticRoom);
+
+      // Server validation in background
+      const result = await makeMove(
+        roomCode,
+        newPlayerState.row,
+        newPlayerState.col
+      );
 
       if ("error" in result) {
-        alert(result.error);
-      }
-      
-      // Immediately refresh state to show the result
-      const refreshResult = await getRoomState(roomCode);
-      if (!("error" in refreshResult)) {
-        setRoom(refreshResult.room);
+        alert(`Move rejected: ${result.error}`);
+        // Rollback: Refresh from server
+        const refreshResult = await getRoomState(roomCode);
+        if (!("error" in refreshResult)) {
+          setRoom(refreshResult.room);
+        }
       }
     } else if (placedBarrier) {
-      // Place barrier
+      // OPTIMISTIC UPDATE: Apply barrier immediately to UI
       const newBarrier = newState.barriers[newState.barriers.length - 1];
-      const orientation = newBarrier.orientation === "H" ? "HORIZONTAL" : "VERTICAL";
+      const orientation =
+        newBarrier.orientation === "H" ? "HORIZONTAL" : "VERTICAL";
 
+      const optimisticRoom: RoomWithPlayers = {
+        ...room,
+        barriers: [
+          ...room.barriers,
+          {
+            id: `temp-${Date.now()}`,
+            roomId: room.id,
+            row: newBarrier.row,
+            col: newBarrier.col,
+            orientation,
+            placedBy: myPlayerId,
+            createdAt: new Date(),
+          },
+        ],
+        players: room.players.map((p) =>
+          p.playerId === myPlayerId ? { ...p, wallsLeft: p.wallsLeft - 1 } : p
+        ),
+        currentTurn: ((room.currentTurn + 1) % room.players.length) as
+          | 0
+          | 1
+          | 2
+          | 3,
+        updatedAt: new Date(),
+      };
+
+      setRoom(optimisticRoom);
+
+      // Server validation in background
       const result = await placeBarrier(
         roomCode,
         newBarrier.row,
@@ -133,13 +255,18 @@ export function GameBoard({ roomCode }: GameBoardProps) {
       );
 
       if ("error" in result) {
-        alert(result.error);
-      }
-      
-      // Immediately refresh state to show the result
-      const refreshResult = await getRoomState(roomCode);
-      if (!("error" in refreshResult)) {
-        setRoom(refreshResult.room);
+        alert(`Barrier rejected: ${result.error}`);
+        // Rollback: Refresh from server
+        const refreshResult = await getRoomState(roomCode);
+        if (!("error" in refreshResult)) {
+          setRoom(refreshResult.room);
+        }
+      } else {
+        // Success: Refresh to get real barrier ID from server
+        const refreshResult = await getRoomState(roomCode);
+        if (!("error" in refreshResult)) {
+          setRoom(refreshResult.room);
+        }
       }
     }
   };
