@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { getOrCreateSessionId } from "@/lib/session";
-import type { GoalSide } from "@prisma/client";
+import type { GoalSide, Prisma } from "@prisma/client";
 
 /**
  * Check if a player has reached their goal
@@ -61,8 +61,8 @@ export async function makeMove(
     // Check win condition
     const isWin = checkWin(player.goalSide, toRow, toCol);
 
-    // Update in transaction
-    await db.$transaction([
+    // Build transaction operations (typed to allow any Prisma promise)
+    const transactionOps: Prisma.PrismaPromise<unknown>[] = [
       // Update player position
       db.player.update({
         where: { id: player.id },
@@ -92,7 +92,29 @@ export async function makeMove(
           status: isWin ? "FINISHED" : room.status,
         },
       }),
-    ]);
+    ];
+
+    // If winner, update user stats for all players in the game
+    if (isWin) {
+      // Increment gamesPlayed for all players with userId
+      // Increment gamesWon for the winner
+      for (const p of room.players) {
+        if (p.userId) {
+          transactionOps.push(
+            db.user.update({
+              where: { id: p.userId },
+              data: {
+                gamesPlayed: { increment: 1 },
+                ...(p.playerId === player.playerId && { gamesWon: { increment: 1 } }),
+              },
+            })
+          );
+        }
+      }
+    }
+
+    // Execute transaction
+    await db.$transaction(transactionOps);
 
     return { success: true };
   } catch (error) {
@@ -326,6 +348,123 @@ export async function placeBarrier(
   } catch (error) {
     console.error("Error placing barrier:", error);
     return { error: "Failed to place barrier" };
+  }
+}
+
+/**
+ * Undo last action (move or barrier placement)
+ * Only allowed if:
+ * 1. The next player hasn't taken their turn yet
+ * 2. The action was made by the current session
+ */
+export async function undoLastAction(
+  code: string
+): Promise<{ success: true } | { error: string }> {
+  try {
+    const sessionId = await getOrCreateSessionId();
+
+    // Get player
+    const player = await db.player.findFirst({
+      where: { sessionId, room: { code } },
+    });
+
+    if (!player) return { error: "Not in this room" };
+
+    // Get room with all data
+    const room = await db.room.findUnique({
+      where: { code },
+      include: {
+        players: true,
+        barriers: { orderBy: { createdAt: "desc" } },
+        moves: { orderBy: { createdAt: "desc" }, take: 1 },
+      },
+    });
+
+    if (!room) return { error: "Room not found" };
+    if (room.status !== "PLAYING") {
+      return { error: "Game not started" };
+    }
+    if (room.winner !== null) {
+      return { error: "Game is finished" };
+    }
+
+    // Calculate previous player (the one who just moved)
+    const previousPlayerId =
+      (room.currentTurn - 1 + room.players.length) % room.players.length;
+
+    // Only the player who just made the move can undo
+    if (player.playerId !== previousPlayerId) {
+      return { error: "Only the player who just moved can undo" };
+    }
+
+    // Get the last move
+    const lastMove = room.moves[0];
+
+    // Get the last barrier (placed by this player)
+    const lastBarrier = room.barriers.find(
+      (b) => b.placedBy === player.playerId
+    );
+
+    // Determine what to undo: check if the last action was a move or barrier
+    // We need to compare timestamps
+    const lastMoveTime = lastMove?.createdAt?.getTime() ?? 0;
+    const lastBarrierTime = lastBarrier?.createdAt?.getTime() ?? 0;
+
+    if (lastMoveTime > lastBarrierTime && lastMove) {
+      // Undo move - verify it's by the same player
+      if (lastMove.playerId !== player.playerId) {
+        return { error: "Cannot undo another player's move" };
+      }
+
+      // Revert the move
+      await db.$transaction([
+        // Move player back
+        db.player.update({
+          where: { id: player.id },
+          data: { row: lastMove.fromRow, col: lastMove.fromCol },
+        }),
+
+        // Delete the move record
+        db.move.delete({
+          where: { id: lastMove.id },
+        }),
+
+        // Revert turn
+        db.room.update({
+          where: { id: room.id },
+          data: { currentTurn: player.playerId },
+        }),
+      ]);
+
+      return { success: true };
+    } else if (lastBarrierTime > lastMoveTime && lastBarrier) {
+      // Undo barrier placement
+      await db.$transaction([
+        // Delete the barrier
+        db.barrier.delete({
+          where: { id: lastBarrier.id },
+        }),
+
+        // Restore wall count
+        db.player.update({
+          where: { id: player.id },
+          data: { wallsLeft: player.wallsLeft + 1 },
+        }),
+
+        // Revert turn
+        db.room.update({
+          where: { id: room.id },
+          data: { currentTurn: player.playerId },
+        }),
+      ]);
+
+      return { success: true };
+    }
+
+    return { error: "Nothing to undo" };
+  } catch (error) {
+    console.error("Error undoing action:", error);
+    return { error: "Failed to undo action" };
   }
 }
 

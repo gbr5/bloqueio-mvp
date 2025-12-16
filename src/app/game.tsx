@@ -1,6 +1,7 @@
 "use client";
 
 import { JSX, useState, useEffect } from "react";
+import { toast } from "@/lib/toast";
 import type {
   PlayerId,
   GoalSide,
@@ -471,7 +472,7 @@ export default function BloqueioPage({
     }
 
     if (currentPlayer.wallsLeft <= 0) {
-      if (!silent) alert("Você não tem mais barreiras disponíveis.");
+      if (!silent) toast.error("No barriers left!");
       return {
         ok: false,
         baseRow: 0,
@@ -490,8 +491,7 @@ export default function BloqueioPage({
       clickCol === 0 ||
       clickCol === SIZE - 1
     ) {
-      if (!silent)
-        alert("Não é permitido colocar barreiras nas bordas coloridas.");
+      if (!silent) toast.error("Cannot place barriers on border cells");
       return {
         ok: false,
         baseRow: 0,
@@ -573,10 +573,10 @@ export default function BloqueioPage({
       edgesToAdd.push(edgeKey(baseRow + 1, baseCol, baseRow + 1, baseCol + 1));
     }
 
-    // 1) não pode reutilizar arestas
+    // 1) Cannot reuse blocked edges
     const anyAlreadyBlocked = edgesToAdd.some((e) => blockedEdges.has(e));
     if (anyAlreadyBlocked) {
-      if (!silent) alert("Já existe uma barreira ocupando esse espaço.");
+      if (!silent) toast.error("A barrier already exists in this space");
       return {
         ok: false,
         baseRow,
@@ -586,14 +586,13 @@ export default function BloqueioPage({
       };
     }
 
-    // 2) não pode cruzar outra barreira em X no mesmo bloco 2x2
+    // 2) Cannot cross another barrier in X pattern at the same 2x2 block
     const crossesExisting = barriers.some(
       (b) =>
         b.row === baseRow && b.col === baseCol && b.orientation !== orientation
     );
     if (crossesExisting) {
-      if (!silent)
-        alert("Não é permitido cruzar barreiras em X no mesmo espaço.");
+      if (!silent) toast.error("Cannot cross barriers in X pattern");
       return {
         ok: false,
         baseRow,
@@ -635,8 +634,8 @@ export default function BloqueioPage({
         blockedPlayers.map((p) => p.name)
       );
       if (!silent)
-        alert(
-          "Essa barreira cortaria completamente o caminho de pelo menos um jogador."
+        toast.error(
+          `This barrier would block ${blockedPlayers[0]?.name ?? "a player"} from their goal`
         );
       return {
         ok: false,

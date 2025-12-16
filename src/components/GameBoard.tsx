@@ -11,8 +11,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/lib/toast";
 import { getRoomState } from "@/lib/actions/room-actions";
-import { makeMove, placeBarrier } from "@/lib/actions/game-actions";
+import { makeMove, placeBarrier, undoLastAction } from "@/lib/actions/game-actions";
 import { getAdaptiveInterval } from "@/config/polling";
 import type { Player, Barrier, Room } from "@prisma/client";
 import BloqueioPage from "@/app/game";
@@ -32,6 +33,8 @@ export function GameBoard({ roomCode }: GameBoardProps) {
   const [room, setRoom] = useState<RoomWithPlayers | null>(null);
   const [myPlayerId, setMyPlayerId] = useState<number | null>(null);
   const [showGameOver, setShowGameOver] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
 
   // Poll for game state updates - ONLY when waiting for opponent
   useEffect(() => {
@@ -45,6 +48,14 @@ export function GameBoard({ roomCode }: GameBoardProps) {
 
       setRoom(result.room);
       setMyPlayerId(result.myPlayerId);
+
+      // Check if player can undo (they just moved and it's now opponent's turn)
+      const previousPlayerId =
+        (result.room.currentTurn - 1 + result.room.players.length) %
+        result.room.players.length;
+      setCanUndo(
+        result.myPlayerId === previousPlayerId && result.room.winner === null
+      );
 
       // Check for winner
       if (result.room.winner !== null && !showGameOver) {
@@ -166,7 +177,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
 
   // Handle moves from BloqueioPage with optimistic updates
   const handleGameStateChange = async (newState: GameSnapshot) => {
-    if (!room || myPlayerId === null) return;
+    if (!room || myPlayerId === null || isLoading) return;
 
     const currentPlayer = room.players.find((p) => p.playerId === myPlayerId);
     const newPlayerState = newState.players.find((p) => p.id === myPlayerId);
@@ -178,6 +189,9 @@ export function GameBoard({ roomCode }: GameBoardProps) {
       currentPlayer.row !== newPlayerState.row ||
       currentPlayer.col !== newPlayerState.col;
     const placedBarrier = newState.barriers.length > room.barriers.length;
+
+    setIsLoading(true);
+    setCanUndo(false);
 
     if (movedPosition) {
       // OPTIMISTIC UPDATE: Apply move immediately to UI
@@ -206,12 +220,15 @@ export function GameBoard({ roomCode }: GameBoardProps) {
       );
 
       if ("error" in result) {
-        alert(`Move rejected: ${result.error}`);
+        toast.error(`Move rejected: ${result.error}`);
         // Rollback: Refresh from server
         const refreshResult = await getRoomState(roomCode);
         if (!("error" in refreshResult)) {
           setRoom(refreshResult.room);
         }
+      } else {
+        // Success - player can now undo
+        setCanUndo(true);
       }
     } else if (placedBarrier) {
       // OPTIMISTIC UPDATE: Apply barrier immediately to UI
@@ -255,7 +272,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
       );
 
       if ("error" in result) {
-        alert(`Barrier rejected: ${result.error}`);
+        toast.error(`Barrier rejected: ${result.error}`);
         // Rollback: Refresh from server
         const refreshResult = await getRoomState(roomCode);
         if (!("error" in refreshResult)) {
@@ -266,9 +283,35 @@ export function GameBoard({ roomCode }: GameBoardProps) {
         const refreshResult = await getRoomState(roomCode);
         if (!("error" in refreshResult)) {
           setRoom(refreshResult.room);
+          setCanUndo(true);
         }
       }
     }
+
+    setIsLoading(false);
+  };
+
+  // Handle undo action
+  const handleUndo = async () => {
+    if (!canUndo || isLoading) return;
+
+    setIsLoading(true);
+
+    const result = await undoLastAction(roomCode);
+
+    if ("error" in result) {
+      toast.error(result.error);
+    } else {
+      toast.success("Action undone");
+      // Refresh state from server
+      const refreshResult = await getRoomState(roomCode);
+      if (!("error" in refreshResult)) {
+        setRoom(refreshResult.room);
+      }
+      setCanUndo(false);
+    }
+
+    setIsLoading(false);
   };
 
   if (!room || !gameState) {
@@ -317,12 +360,52 @@ export function GameBoard({ roomCode }: GameBoardProps) {
         </div>
       </div>
 
+      {/* Undo Button - shown when player can undo */}
+      {canUndo && !isMyTurn && (
+        <div className="absolute top-4 right-4 z-10">
+          <button
+            onClick={handleUndo}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-800 disabled:opacity-50 text-white font-medium rounded-lg transition-colors shadow-lg"
+          >
+            {isLoading ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+            ) : (
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                />
+              </svg>
+            )}
+            Undo
+          </button>
+        </div>
+      )}
+
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-20 pointer-events-none">
+          <div className="bg-slate-800/90 backdrop-blur border border-slate-700 rounded-lg px-6 py-3 flex items-center gap-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent" />
+            <span className="text-white text-sm">Processing...</span>
+          </div>
+        </div>
+      )}
+
       {/* Game board */}
       <BloqueioPage
         gameState={gameState}
         onGameStateChange={handleGameStateChange}
         myPlayerId={myPlayerId}
-        disabled={!isMyTurn || gameState.winner !== null}
+        disabled={!isMyTurn || gameState.winner !== null || isLoading}
       />
 
       {/* Game Over Modal */}

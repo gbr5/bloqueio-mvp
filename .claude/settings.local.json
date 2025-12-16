@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(tree:*)",
+      "Bash(pnpm exec tsc:*)",
+      "Bash(curl:*)",
+      "mcp__ide__getDiagnostics"
+    ]
+  }
+}
