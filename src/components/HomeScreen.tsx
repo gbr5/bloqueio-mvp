@@ -10,9 +10,10 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import { AuthModal } from "./AuthModal";
+import { AuthOrGuestModal } from "./AuthOrGuestModal";
 import { UserMenu } from "./UserMenu";
 import { Leaderboard } from "./Leaderboard";
 
@@ -29,8 +30,63 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const { data: session, isPending } = useSession();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAuthOrGuestModal, setShowAuthOrGuestModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"create" | "join" | null>(
+    null
+  );
+  const [guestName, setGuestName] = useState<string | null>(null);
 
   const user = session?.user;
+
+  // Load guest name from localStorage on mount
+  useEffect(() => {
+    const storedName = localStorage.getItem("guest_name");
+    if (storedName) {
+      setGuestName(storedName);
+    }
+  }, []);
+
+  // Check if user can proceed (authenticated or has guest name)
+  const canProceed = !!user || !!guestName;
+
+  // Handle create/join button clicks
+  const handleCreateRoom = useCallback(() => {
+    if (canProceed) {
+      onCreateRoom();
+    } else {
+      setPendingAction("create");
+      setShowAuthOrGuestModal(true);
+    }
+  }, [canProceed, onCreateRoom]);
+
+  const handleJoinRoom = useCallback(() => {
+    if (canProceed) {
+      onJoinRoom();
+    } else {
+      setPendingAction("join");
+      setShowAuthOrGuestModal(true);
+    }
+  }, [canProceed, onJoinRoom]);
+
+  // Handle auth/guest modal completion
+  const handleAuthOrGuestComplete = useCallback(() => {
+    // Refresh guest name from localStorage
+    const storedName = localStorage.getItem("guest_name");
+    if (storedName) {
+      setGuestName(storedName);
+    }
+
+    // Execute pending action
+    if (pendingAction === "create") {
+      onCreateRoom();
+    } else if (pendingAction === "join") {
+      onJoinRoom();
+    }
+    setPendingAction(null);
+  }, [pendingAction, onCreateRoom, onJoinRoom]);
+
+  // Get display name for welcome message
+  const displayName = user?.name?.split(" ")[0] || guestName;
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-radial from-slate-950 to-black">
@@ -72,33 +128,33 @@ export function HomeScreen({
           </h1>
 
           {/* Welcome Message */}
-          {user && (
+          {displayName && (
             <p className="text-center text-blue-400 mb-4">
-              Welcome back, {user.name.split(" ")[0]}!
+              Bem-vindo, {displayName}!
             </p>
           )}
 
           {/* Subtitle */}
           <p className="text-center text-slate-400 mb-12">
-            Strategic barrier placement game
+            Jogo estratégico de barreiras
           </p>
 
           {/* Menu Options */}
           <div className="space-y-4">
             {/* Create New Game */}
             <button
-              onClick={onCreateRoom}
+              onClick={handleCreateRoom}
               className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 shadow-lg hover:shadow-blue-500/50"
             >
-              Create New Game
+              Criar Novo Jogo
             </button>
 
             {/* Join Game */}
             <button
-              onClick={onJoinRoom}
+              onClick={handleJoinRoom}
               className="w-full py-4 px-6 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors duration-200 shadow-lg hover:shadow-green-500/50"
             >
-              Join Game
+              Entrar em Jogo
             </button>
 
             {/* Play Offline */}
@@ -106,7 +162,7 @@ export function HomeScreen({
               onClick={onPlayOffline}
               className="w-full py-4 px-6 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-colors duration-200 shadow-lg"
             >
-              Play Offline
+              Jogar Offline
             </button>
           </div>
 
@@ -118,18 +174,18 @@ export function HomeScreen({
                   onClick={() => setShowAuthModal(true)}
                   className="text-blue-400 hover:text-blue-300 font-medium"
                 >
-                  Create an account
+                  Crie uma conta
                 </button>{" "}
-                to save your game stats and track your progress!
+                para salvar suas estatísticas e acompanhar seu progresso!
               </p>
             </div>
           )}
 
           {/* Footer */}
           <div className="mt-12 text-center text-slate-500 text-sm">
-            <p>4-player strategic board game</p>
+            <p>Jogo de tabuleiro estratégico para 4 jogadores</p>
             <p className="mt-2">
-              Race to opposite sides while blocking opponents
+              Corra para o lado oposto enquanto bloqueia oponentes
             </p>
           </div>
 
@@ -145,6 +201,20 @@ export function HomeScreen({
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+          // Refresh session state will happen automatically
+          setShowAuthModal(false);
+        }}
+      />
+
+      {/* Auth or Guest Modal */}
+      <AuthOrGuestModal
+        isOpen={showAuthOrGuestModal}
+        onClose={() => {
+          setShowAuthOrGuestModal(false);
+          setPendingAction(null);
+        }}
+        onComplete={handleAuthOrGuestComplete}
       />
     </div>
   );

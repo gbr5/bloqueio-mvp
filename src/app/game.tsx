@@ -1005,7 +1005,7 @@ export default function BloqueioPage({
       const p = players.find((pl) => pl.id === winner)!;
       return `${p.name} venceu!`;
     }
-    return `Vez de ${currentPlayer.label} (${
+    return `Vez de ${currentPlayer.name} (${
       mode === "move" ? "mover peão" : "colocar barreira"
     })`;
   })();

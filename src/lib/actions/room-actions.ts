@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { getOrCreateSessionId } from "@/lib/session";
+import { getOrCreateSessionId, getGuestName } from "@/lib/session";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import type { GoalSide, BarrierOrientation } from "@prisma/client";
@@ -67,6 +67,9 @@ export async function createRoom(): Promise<
       headers: await headers(),
     });
 
+    // Get guest name from cookie (for non-authenticated users)
+    const guestName = await getGuestName();
+
     // Generate unique room code
     let code = generateRoomCode();
     let existing = await db.room.findUnique({ where: { code } });
@@ -79,6 +82,9 @@ export async function createRoom(): Promise<
 
     const config = PLAYER_CONFIGS[0]; // Host is always player 0
 
+    // Determine player name: auth user name > guest name > default
+    const playerName = session?.user?.name || guestName || config.name;
+
     // Create room + host player in transaction
     const room = await db.room.create({
       data: {
@@ -89,7 +95,7 @@ export async function createRoom(): Promise<
             playerId: 0,
             sessionId,
             userId: session?.user?.id || null,
-            name: session?.user?.name || config.name,
+            name: playerName,
             color: config.color,
             row: config.row,
             col: config.col,
@@ -121,6 +127,9 @@ export async function joinRoom(
       headers: await headers(),
     });
 
+    // Get guest name from cookie (for non-authenticated users)
+    const guestName = await getGuestName();
+
     // Check if already in this room
     const existing = await db.player.findFirst({
       where: { sessionId, room: { code } },
@@ -136,9 +145,9 @@ export async function joinRoom(
       include: { players: true },
     });
 
-    if (!room) return { error: "Room not found" };
-    if (room.players.length >= 4) return { error: "Room is full" };
-    if (room.status !== "WAITING") return { error: "Game already started" };
+    if (!room) return { error: "Sala não encontrada" };
+    if (room.players.length >= 4) return { error: "Sala cheia" };
+    if (room.status !== "WAITING") return { error: "Jogo já iniciado" };
 
     // Check if user already joined (if authenticated)
     if (session?.user?.id) {
@@ -146,7 +155,7 @@ export async function joinRoom(
         where: { userId: session.user.id, roomId: room.id },
       });
       if (userPlayer) {
-        return { error: "You already joined this room" };
+        return { error: "Você já está nesta sala" };
       }
     }
 
@@ -155,10 +164,13 @@ export async function joinRoom(
     const nextId = [0, 1, 2, 3].find((id) => !takenIds.has(id));
 
     if (nextId === undefined) {
-      return { error: "Room is full" };
+      return { error: "Sala cheia" };
     }
 
     const config = PLAYER_CONFIGS[nextId];
+
+    // Determine player name: auth user name > guest name > default
+    const playerName = session?.user?.name || guestName || config.name;
 
     // Create player
     await db.player.create({
@@ -167,7 +179,7 @@ export async function joinRoom(
         playerId: nextId,
         sessionId,
         userId: session?.user?.id || null,
-        name: session?.user?.name || config.name,
+        name: playerName,
         color: config.color,
         row: config.row,
         col: config.col,
@@ -178,7 +190,7 @@ export async function joinRoom(
     return { playerId: nextId };
   } catch (error) {
     console.error("Error joining room:", error);
-    return { error: "Failed to join room" };
+    return { error: "Falha ao entrar na sala" };
   }
 }
 

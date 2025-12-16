@@ -9,10 +9,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "@/lib/auth-client";
 import { toast } from "@/lib/toast";
 import { getRoomState } from "@/lib/actions/room-actions";
 import { startGame } from "@/lib/actions/game-actions";
 import { POLLING_INTERVALS } from "@/config/polling";
+import { AuthOrGuestModal } from "./AuthOrGuestModal";
 import type { Room, Player } from "@prisma/client";
 
 interface WaitingLobbyProps {
@@ -25,11 +27,33 @@ type RoomWithPlayers = Room & {
 
 export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
   const router = useRouter();
+  const { data: session, isPending: sessionPending } = useSession();
   const [room, setRoom] = useState<RoomWithPlayers | null>(null);
   const [myPlayerId, setMyPlayerId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [guestName, setGuestName] = useState<string | null>(null);
+
+  // Check if user has identity (auth or guest name)
+  const user = session?.user;
+  const hasIdentity = !!user || !!guestName;
+
+  // Load guest name from localStorage on mount
+  useEffect(() => {
+    const storedName = localStorage.getItem("guest_name");
+    if (storedName) {
+      setGuestName(storedName);
+    }
+  }, []);
+
+  // Show auth modal if user has no identity (after session check completes)
+  useEffect(() => {
+    if (!sessionPending && !hasIdentity && !showAuthModal) {
+      setShowAuthModal(true);
+    }
+  }, [sessionPending, hasIdentity, showAuthModal]);
 
   // Poll for room updates
   useEffect(() => {
@@ -75,14 +99,14 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
       // Navigation will happen automatically via polling
     } catch (error) {
       console.error("Failed to start game:", error);
-      toast.error("Failed to start game");
+      toast.error("Falha ao iniciar jogo");
       setStarting(false);
     }
   };
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(roomCode);
-    toast.success("Room code copied!");
+    toast.success("Código copiado!");
   };
 
   const handleLeaveRoom = () => {
@@ -96,7 +120,7 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
       <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-slate-400">Loading lobby...</p>
+          <p className="text-slate-400">Carregando lobby...</p>
         </div>
       </div>
     );
@@ -106,12 +130,12 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
         <div className="text-center">
-          <p className="text-red-400 mb-4">{error || "Room not found"}</p>
+          <p className="text-red-400 mb-4">{error || "Sala não encontrada"}</p>
           <button
             onClick={() => router.push("/")}
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
           >
-            Return Home
+            Voltar ao Início
           </button>
         </div>
       </div>
@@ -127,10 +151,10 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
       <div className="w-full max-w-2xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-4">Waiting Lobby</h1>
+          <h1 className="text-4xl font-bold text-white mb-4">Sala de Espera</h1>
           <div className="flex items-center justify-center gap-4">
             <div className="bg-slate-800 border border-slate-600 rounded-lg px-6 py-3">
-              <p className="text-sm text-slate-400 mb-1">Room Code</p>
+              <p className="text-sm text-slate-400 mb-1">Código da Sala</p>
               <p className="text-3xl font-mono font-bold text-white tracking-wider">
                 {roomCode}
               </p>
@@ -139,7 +163,7 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
               onClick={handleCopyCode}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-semibold"
             >
-              Copy Code
+              Copiar
             </button>
           </div>
         </div>
@@ -148,10 +172,10 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
         <div className="bg-slate-800/90 border border-slate-700 rounded-xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-white">
-              Players ({playerCount}/4)
+              Jogadores ({playerCount}/4)
             </h2>
             {playerCount < 2 && (
-              <p className="text-sm text-yellow-400">Need at least 2 players</p>
+              <p className="text-sm text-yellow-400">Mínimo de 2 jogadores</p>
             )}
           </div>
 
@@ -168,18 +192,18 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
                 <div className="flex-1">
                   <p className="text-white font-semibold">{player.name}</p>
                   <p className="text-sm text-slate-400">
-                    Player {player.playerId + 1}
+                    Jogador {player.playerId + 1}
                   </p>
                 </div>
                 <div className="flex gap-2">
                   {player.playerId === myPlayerId && (
                     <span className="px-3 py-1 bg-blue-600/30 border border-blue-500 text-blue-300 text-xs font-semibold rounded-full">
-                      YOU
+                      VOCÊ
                     </span>
                   )}
                   {player.playerId === 0 && (
                     <span className="px-3 py-1 bg-yellow-600/30 border border-yellow-500 text-yellow-300 text-xs font-semibold rounded-full">
-                      HOST
+                      ANFITRIÃO
                     </span>
                   )}
                 </div>
@@ -194,7 +218,7 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
               >
                 <div className="w-12 h-12 rounded-full bg-slate-700 shrink-0" />
                 <div className="flex-1">
-                  <p className="text-slate-500">Waiting for player...</p>
+                  <p className="text-slate-500">Aguardando jogador...</p>
                 </div>
               </div>
             ))}
@@ -212,18 +236,18 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
               {starting ? (
                 <>
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white" />
-                  <span>Starting Game...</span>
+                  <span>Iniciando Jogo...</span>
                 </>
               ) : (
                 <>
                   <span>🎮</span>
-                  <span>Start Game</span>
+                  <span>Iniciar Jogo</span>
                 </>
               )}
             </button>
           ) : (
             <div className="w-full py-4 px-6 bg-slate-700/50 border border-slate-600 text-slate-400 font-semibold text-center rounded-lg">
-              Waiting for host to start...
+              Aguardando anfitrião iniciar...
             </div>
           )}
 
@@ -232,7 +256,7 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
             disabled={starting}
             className="w-full py-3 px-6 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg transition-colors duration-200"
           >
-            Leave Room
+            Sair da Sala
           </button>
         </div>
 
@@ -240,11 +264,31 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
         <div className="mt-6 p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
           <p className="text-sm text-slate-400 text-center">
             {isHost
-              ? "Share the room code with friends. Start when everyone is ready!"
-              : "Waiting for the host to start the game..."}
+              ? "Compartilhe o código da sala com amigos. Inicie quando todos estiverem prontos!"
+              : "Aguardando o host iniciar o jogo..."}
           </p>
         </div>
       </div>
+
+      {/* Auth/Guest Modal */}
+      <AuthOrGuestModal
+        isOpen={showAuthModal}
+        onClose={() => {
+          // If user closes without identity, redirect home
+          if (!hasIdentity) {
+            router.push("/");
+          }
+          setShowAuthModal(false);
+        }}
+        onComplete={() => {
+          // Refresh guest name from localStorage
+          const storedName = localStorage.getItem("guest_name");
+          if (storedName) {
+            setGuestName(storedName);
+          }
+          setShowAuthModal(false);
+        }}
+      />
     </div>
   );
 }

@@ -103,7 +103,7 @@ export function JoinRoom({ onCancel }: JoinRoomProps) {
     if (fullCode.length === 6) {
       handleJoin(fullCode);
     } else {
-      setError("Please enter a 6-character room code");
+      setError("Por favor, digite um código de 6 caracteres");
     }
   };
 
@@ -113,13 +113,13 @@ export function JoinRoom({ onCancel }: JoinRoomProps) {
     <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
       <div className="w-full max-w-md px-8">
         <h1 className="text-4xl font-bold text-center mb-8 text-white">
-          Join Game
+          Entrar no Jogo
         </h1>
 
         {/* Room Code Input */}
         <div className="mb-8">
           <label className="block text-sm font-medium text-slate-300 mb-4 text-center">
-            Enter Room Code
+            Digite o Código da Sala
           </label>
           <div className="flex justify-center gap-2 mb-2">
             {code.map((char, index) => (
@@ -140,7 +140,7 @@ export function JoinRoom({ onCancel }: JoinRoomProps) {
             ))}
           </div>
           <p className="text-center text-xs text-slate-500 mt-2">
-            Paste or type the 6-character code
+            Cole ou digite o código de 6 caracteres
           </p>
         </div>
 
@@ -161,10 +161,10 @@ export function JoinRoom({ onCancel }: JoinRoomProps) {
             {joining ? (
               <>
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
-                <span>Joining...</span>
+                <span>Entrando...</span>
               </>
             ) : (
-              "Join Room"
+              "Entrar na Sala"
             )}
           </button>
 
@@ -173,14 +173,14 @@ export function JoinRoom({ onCancel }: JoinRoomProps) {
             disabled={joining}
             className="w-full py-3 px-6 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg transition-colors duration-200"
           >
-            Cancel
+            Cancelar
           </button>
         </div>
 
         {/* Instructions */}
         <div className="mt-8 p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
           <p className="text-sm text-slate-400 text-center">
-            Ask the host for the room code to join their game
+            Peça ao anfitrião o código da sala para entrar no jogo
           </p>
         </div>
       </div>
