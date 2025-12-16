@@ -30,9 +30,6 @@ interface BloqueioPageProps {
 const INNER_SIZE = 9;
 const SIZE = INNER_SIZE + 2; // 11x11 com bordas
 
-const COL_LABELS = "ABCDEFGHI".split("");
-const ROW_LABELS = Array.from({ length: INNER_SIZE }, (_, i) => String(i + 1));
-
 function edgeKey(r1: number, c1: number, r2: number, c2: number) {
   if (r1 > r2 || (r1 === r2 && c1 > c2)) {
     [r1, r2] = [r2, r1];
@@ -107,9 +104,17 @@ function createInitialPlayers(): Player[] {
 
 // BFS para checar se ainda existe algum caminho até o objetivo
 function hasPathToGoal(player: Player, blockedEdges: Set<string>): boolean {
+  console.log(
+    `[BFS DEBUG] Starting for ${player.name} at (${player.row},${player.col}) goal=${player.goalSide}`
+  );
+  console.log(`[BFS DEBUG] INNER_SIZE=${INNER_SIZE}, SIZE=${SIZE}`);
+  console.log(`[BFS DEBUG] Blocked edges:`, Array.from(blockedEdges));
+
   const visited = Array.from({ length: SIZE }, () => Array(SIZE).fill(false));
   const queue: Cell[] = [{ row: player.row, col: player.col }];
   visited[player.row][player.col] = true;
+
+  let cellsExplored = 0;
 
   const directions = [
     { dr: -1, dc: 0 },
@@ -120,12 +125,43 @@ function hasPathToGoal(player: Player, blockedEdges: Set<string>): boolean {
 
   while (queue.length > 0) {
     const { row, col } = queue.shift() as Cell;
-    if (isGoal(row, col, player.goalSide)) return true;
+    cellsExplored++;
+
+    // Check if this cell is ADJACENT to the goal border (one move away from winning)
+    // We just check if player can REACH this position, not if they can make the final winning move
+    if (player.goalSide === "TOP" && row === 1) {
+      console.log(
+        `[BFS DEBUG] SUCCESS! Reached row=1, can reach TOP goal. Explored ${cellsExplored} cells.`
+      );
+      return true;
+    }
+    if (player.goalSide === "BOTTOM" && row === INNER_SIZE) {
+      console.log(
+        `[BFS DEBUG] SUCCESS! Reached row=${INNER_SIZE}, can reach BOTTOM goal. Explored ${cellsExplored} cells.`
+      );
+      return true;
+    }
+    if (player.goalSide === "LEFT" && col === 1) {
+      console.log(
+        `[BFS DEBUG] SUCCESS! Reached col=1, can reach LEFT goal. Explored ${cellsExplored} cells.`
+      );
+      return true;
+    }
+    if (player.goalSide === "RIGHT" && col === INNER_SIZE) {
+      console.log(
+        `[BFS DEBUG] SUCCESS! Reached col=${INNER_SIZE}, can reach RIGHT goal. Explored ${cellsExplored} cells.`
+      );
+      return true;
+    }
 
     for (const { dr, dc } of directions) {
       const nr = row + dr;
       const nc = col + dc;
-      if (!isInside(nr, nc)) continue;
+
+      // CRITICAL: Only explore INTERNAL cells (1-9)
+      // Players cannot walk through border cells!
+      if (nr < 1 || nr > INNER_SIZE || nc < 1 || nc > INNER_SIZE) continue;
+
       if (visited[nr][nc]) continue;
       if (blockedEdges.has(edgeKey(row, col, nr, nc))) continue;
 
@@ -133,6 +169,10 @@ function hasPathToGoal(player: Player, blockedEdges: Set<string>): boolean {
       queue.push({ row: nr, col: nc });
     }
   }
+
+  console.log(
+    `[BFS DEBUG] FAILED! No path found after exploring ${cellsExplored} cells.`
+  );
   return false;
 }
 
@@ -177,26 +217,119 @@ function canPawnMoveTo(
     return true;
   }
 
-  // 2) pulo em linha reta (2 casas)
+  // 2) pulo em linha reta (2 casas na mesma direção)
   const isStraightTwo = (adr === 2 && adc === 0) || (adr === 0 && adc === 2);
-  if (!isStraightTwo) return false;
+  if (isStraightTwo) {
+    const midRow = player.row + (dr === 0 ? 0 : dr > 0 ? 1 : -1);
+    const midCol = player.col + (dc === 0 ? 0 : dc > 0 ? 1 : -1);
 
-  const midRow = player.row + (dr === 0 ? 0 : dr > 0 ? 1 : -1);
-  const midCol = player.col + (dc === 0 ? 0 : dc > 0 ? 1 : -1);
+    if (!isInside(midRow, midCol)) return false;
 
-  if (!isInside(midRow, midCol)) return false;
+    const middlePawn = players.find(
+      (p) => p.row === midRow && p.col === midCol
+    );
+    if (!middlePawn) return false;
 
-  const middlePawn = players.find((p) => p.row === midRow && p.col === midCol);
-  if (!middlePawn) return false;
+    // Check if path is clear
+    if (
+      blockedEdges.has(edgeKey(player.row, player.col, midRow, midCol)) ||
+      blockedEdges.has(edgeKey(midRow, midCol, destRow, destCol))
+    ) {
+      return false;
+    }
 
-  if (
-    blockedEdges.has(edgeKey(player.row, player.col, midRow, midCol)) ||
-    blockedEdges.has(edgeKey(midRow, midCol, destRow, destCol))
-  ) {
+    return true;
+  }
+
+  // 3) Side-step jump (diagonal move when jumping over adjacent player)
+  // Manhattan distance of 2, but diagonal (e.g., 1 up + 1 right)
+  if (manhattan === 2 && adr === 1 && adc === 1) {
+    // Check all 4 orthogonal neighbors for a player to jump over
+    const neighbors = [
+      { dr: -1, dc: 0 }, // up
+      { dr: 1, dc: 0 }, // down
+      { dr: 0, dc: -1 }, // left
+      { dr: 0, dc: 1 }, // right
+    ];
+
+    for (const { dr: ndr, dc: ndc } of neighbors) {
+      const neighborRow = player.row + ndr;
+      const neighborCol = player.col + ndc;
+
+      if (!isInside(neighborRow, neighborCol)) continue;
+
+      // Is there a player at this neighbor position?
+      const neighborPawn = players.find(
+        (p) => p.row === neighborRow && p.col === neighborCol
+      );
+      if (!neighborPawn) continue;
+
+      // CRITICAL: Can we reach this neighbor (no barrier blocking)?
+      if (
+        blockedEdges.has(
+          edgeKey(player.row, player.col, neighborRow, neighborCol)
+        )
+      ) {
+        continue;
+      }
+
+      // Calculate the straight-ahead position from neighbor
+      const straightRow = neighborRow + ndr;
+      const straightCol = neighborCol + ndc;
+
+      // Check if straight jump is blocked (barrier or edge)
+      const straightBlocked =
+        !isInside(straightRow, straightCol) ||
+        blockedEdges.has(
+          edgeKey(neighborRow, neighborCol, straightRow, straightCol)
+        ) ||
+        // Also check if destination cell would be occupied
+        players.some((p) => p.row === straightRow && p.col === straightCol);
+
+      if (!straightBlocked) {
+        // Straight jump is possible, side-step not allowed in this direction
+        continue;
+      }
+
+      // Straight is blocked, check if we can side-step to destination
+      // Destination must be perpendicular to the jump direction AND adjacent to neighbor
+      const isPerpendicularJump =
+        (ndr !== 0 &&
+          destRow === neighborRow &&
+          Math.abs(destCol - neighborCol) === 1) ||
+        (ndc !== 0 &&
+          destCol === neighborCol &&
+          Math.abs(destRow - neighborRow) === 1);
+
+      if (!isPerpendicularJump) continue;
+
+      // CRITICAL: Verify destination is actually reachable from neighbor position
+      // Must be exactly adjacent to the neighbor (already checked above)
+      // AND verify no barrier blocks the side-step
+      if (
+        blockedEdges.has(edgeKey(neighborRow, neighborCol, destRow, destCol))
+      ) {
+        continue;
+      }
+
+      // Additional check: The destination must actually form a valid diagonal
+      // from our current position (must go through the neighbor)
+      const isDiagonalThroughNeighbor =
+        Math.abs(destRow - player.row) === 1 &&
+        Math.abs(destCol - player.col) === 1;
+
+      if (!isDiagonalThroughNeighbor) continue;
+
+      // Valid side-step jump!
+      return true;
+    }
+
+    // No valid side-step jump found
     return false;
   }
 
-  return true;
+  // Invalid move
+  return false;
 }
 
 export default function BloqueioPage({
@@ -348,10 +481,17 @@ export default function BloqueioPage({
       };
     }
 
-    // Barriers CANNOT be placed on border cells (row/col 0 or SIZE-1)
-    // Barriers must be at least 1 cell away from borders
-    if (clickRow === 0 || clickRow >= SIZE - 2 || clickCol === 0 || clickCol >= SIZE - 2) {
-      if (!silent) alert("Não é permitido colocar barreiras nas bordas coloridas.");
+    // Barriers CANNOT be placed ON the colored border cells (row/col 0 or SIZE-1)
+    // But barriers CAN block the edge between border and internal board
+    // Click must be on internal cells (1 to SIZE-2), not on borders
+    if (
+      clickRow === 0 ||
+      clickRow === SIZE - 1 ||
+      clickCol === 0 ||
+      clickCol === SIZE - 1
+    ) {
+      if (!silent)
+        alert("Não é permitido colocar barreiras nas bordas coloridas.");
       return {
         ok: false,
         baseRow: 0,
@@ -361,8 +501,46 @@ export default function BloqueioPage({
       };
     }
 
-    const baseRow = Math.max(1, Math.min(clickRow, SIZE - 3));
-    const baseCol = Math.max(1, Math.min(clickCol, SIZE - 3));
+    // baseRow/baseCol determine where the barrier is anchored
+    // Horizontal barrier at baseRow blocks edges between rows baseRow and baseRow+1
+    // Vertical barrier at baseCol blocks edges between cols baseCol and baseCol+1
+    //
+    // To allow blocking ALL border edges (top, left, bottom, right):
+    // - Clicking row 1 with H barrier → baseRow=0 (blocks row 0↔1, top border)
+    // - Clicking row 9 with H barrier → baseRow=9 (blocks row 9↔10, bottom border)
+    // - Same logic for columns with V barriers
+    //
+    // Strategy: Use clickRow-1 as base, but when clicking on the last internal row/col,
+    // use clickRow directly to allow placing barrier at the far edge.
+    //
+    // For HORIZONTAL barriers spanning 2 columns:
+    //   - baseRow range: 0 to SIZE-2 (=9) to cover all horizontal edges
+    //   - baseCol range: 0 to SIZE-3 (=8) since barrier needs baseCol and baseCol+1
+    // For VERTICAL barriers spanning 2 rows:
+    //   - baseCol range: 0 to SIZE-2 (=9) to cover all vertical edges
+    //   - baseRow range: 0 to SIZE-3 (=8) since barrier needs baseRow and baseRow+1
+    let baseRow: number;
+    let baseCol: number;
+
+    if (wallOrientation === "H") {
+      // For horizontal barriers: allow baseRow up to SIZE-2 to block bottom border
+      // Clicking last internal row (INNER_SIZE = 9) should give baseRow = 9
+      if (clickRow === INNER_SIZE) {
+        baseRow = clickRow; // Place at bottom edge
+      } else {
+        baseRow = Math.max(0, clickRow - 1);
+      }
+      baseCol = Math.max(0, Math.min(clickCol - 1, SIZE - 3));
+    } else {
+      // For vertical barriers: allow baseCol up to SIZE-2 to block right border
+      // Clicking last internal col (INNER_SIZE = 9) should give baseCol = 9
+      if (clickCol === INNER_SIZE) {
+        baseCol = clickCol; // Place at right edge
+      } else {
+        baseCol = Math.max(0, clickCol - 1);
+      }
+      baseRow = Math.max(0, Math.min(clickRow - 1, SIZE - 3));
+    }
 
     const edgesToAdd: string[] = [];
     const orientation = wallOrientation;
@@ -428,11 +606,34 @@ export default function BloqueioPage({
     const newBlocked = new Set(blockedEdges);
     edgesToAdd.forEach((e) => newBlocked.add(e));
 
-    // 3) ainda existe algum caminho até o lado objetivo (pode andar pra trás)
-    const allHavePath = players.every((player) =>
-      hasPathToGoal(player, newBlocked)
+    console.log(
+      `[CLIENT PATHFINDING] Checking barrier at (${baseRow},${baseCol}) ${orientation}`
     );
+    console.log(`[CLIENT PATHFINDING] New edges:`, edgesToAdd);
+    console.log(
+      `[CLIENT PATHFINDING] Total blocked edges:`,
+      Array.from(newBlocked)
+    );
+
+    // 3) ainda existe algum caminho até o lado objetivo (pode andar pra trás)
+    const pathResults = players.map((player) => {
+      const hasPath = hasPathToGoal(player, newBlocked);
+      console.log(
+        `[CLIENT PATHFINDING] Player ${player.name} at (${player.row},${
+          player.col
+        }) goal ${player.goalSide}: ${hasPath ? "✅ HAS PATH" : "❌ BLOCKED"}`
+      );
+      return hasPath;
+    });
+
+    const allHavePath = pathResults.every((hasPath) => hasPath);
+
     if (!allHavePath) {
+      const blockedPlayers = players.filter((_, i) => !pathResults[i]);
+      console.error(
+        `[CLIENT PATHFINDING] BLOCKING! Players trapped:`,
+        blockedPlayers.map((p) => p.name)
+      );
       if (!silent)
         alert(
           "Essa barreira cortaria completamente o caminho de pelo menos um jogador."
@@ -445,6 +646,8 @@ export default function BloqueioPage({
         edgesToAdd,
       };
     }
+
+    console.log(`[CLIENT PATHFINDING] All players can still reach goals ✅`);
 
     return {
       ok: true,
@@ -630,6 +833,26 @@ export default function BloqueioPage({
           }}
         >
           {pawn}
+
+          {/* Display row/column numbers on border cells */}
+          {(row === 0 || row === SIZE - 1 || col === 0 || col === SIZE - 1) && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "0.7rem",
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.9)",
+                textShadow: "0 1px 2px rgba(0,0,0,0.8)",
+                pointerEvents: "none",
+              }}
+            >
+              {row === 0 || row === SIZE - 1 ? col : row}
+            </div>
+          )}
         </button>
       );
     }
@@ -818,86 +1041,6 @@ export default function BloqueioPage({
 
               {barrierOverlays}
               {ghostBarrier}
-
-              {/* Colunas A–I (cima/baixo) mapeadas para colunas internas 1..SIZE-2 */}
-              {COL_LABELS.map((label, idx) => {
-                const colIndex = idx + 1; // interno
-                const left = ((colIndex + 0.5) * 100) / SIZE;
-                return (
-                  <span
-                    key={`top-${label}`}
-                    style={{
-                      position: "absolute",
-                      top: "-1.4rem",
-                      left: `${left}%`,
-                      transform: "translateX(-50%)",
-                      fontSize: "0.8rem",
-                      color: "#9ca3af",
-                    }}
-                  >
-                    {label}
-                  </span>
-                );
-              })}
-              {COL_LABELS.map((label, idx) => {
-                const colIndex = idx + 1;
-                const left = ((colIndex + 0.5) * 100) / SIZE;
-                return (
-                  <span
-                    key={`bottom-${label}`}
-                    style={{
-                      position: "absolute",
-                      bottom: "-1.4rem",
-                      left: `${left}%`,
-                      transform: "translateX(-50%)",
-                      fontSize: "0.8rem",
-                      color: "#9ca3af",
-                    }}
-                  >
-                    {label}
-                  </span>
-                );
-              })}
-
-              {/* Linhas 1–9 (esquerda/direita) mapeadas para linhas internas 1..SIZE-2 */}
-              {ROW_LABELS.map((label, idx) => {
-                const rowIndex = idx + 1;
-                const top = ((rowIndex + 0.5) * 100) / SIZE;
-                return (
-                  <span
-                    key={`left-${label}`}
-                    style={{
-                      position: "absolute",
-                      left: "-1.4rem",
-                      top: `${top}%`,
-                      transform: "translateY(-50%)",
-                      fontSize: "0.8rem",
-                      color: "#9ca3af",
-                    }}
-                  >
-                    {label}
-                  </span>
-                );
-              })}
-              {ROW_LABELS.map((label, idx) => {
-                const rowIndex = idx + 1;
-                const top = ((rowIndex + 0.5) * 100) / SIZE;
-                return (
-                  <span
-                    key={`right-${label}`}
-                    style={{
-                      position: "absolute",
-                      right: "-1.4rem",
-                      top: `${top}%`,
-                      transform: "translateY(-50%)",
-                      fontSize: "0.8rem",
-                      color: "#9ca3af",
-                    }}
-                  >
-                    {label}
-                  </span>
-                );
-              })}
             </div>
           </div>
 
