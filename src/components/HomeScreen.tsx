@@ -14,6 +14,7 @@ import { useState } from "react";
 import { useSession } from "@/lib/auth-client";
 import { AuthModal } from "./AuthModal";
 import { UserMenu } from "./UserMenu";
+import { Leaderboard } from "./Leaderboard";
 
 interface HomeScreenProps {
   onCreateRoom: () => void;
@@ -57,7 +58,14 @@ export function HomeScreen({
 
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center">
-        <div className="w-full max-w-md px-8">
+        <div className="w-full max-w-4xl px-8 flex gap-8 items-start">
+          {/* Left side - Leaderboard (desktop only) */}
+          <div className="hidden lg:block w-72 shrink-0">
+            <Leaderboard limit={5} />
+          </div>
+
+          {/* Center - Main Menu */}
+          <div className="flex-1 max-w-md mx-auto">
           {/* Title */}
           <h1 className="text-6xl font-bold text-center mb-4 text-white tracking-wider">
             BLOQUEIO
@@ -123,6 +131,12 @@ export function HomeScreen({
             <p className="mt-2">
               Race to opposite sides while blocking opponents
             </p>
+          </div>
+
+          {/* Mobile Leaderboard */}
+          <div className="lg:hidden mt-8">
+            <Leaderboard limit={5} />
+          </div>
           </div>
         </div>
       </div>

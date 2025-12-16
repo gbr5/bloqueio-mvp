@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { getOrCreateSessionId } from "@/lib/session";
-import type { GoalSide } from "@prisma/client";
+import type { GoalSide, Prisma } from "@prisma/client";
 
 /**
  * Check if a player has reached their goal
@@ -61,8 +61,8 @@ export async function makeMove(
     // Check win condition
     const isWin = checkWin(player.goalSide, toRow, toCol);
 
-    // Update in transaction
-    await db.$transaction([
+    // Build transaction operations (typed to allow any Prisma promise)
+    const transactionOps: Prisma.PrismaPromise<unknown>[] = [
       // Update player position
       db.player.update({
         where: { id: player.id },
@@ -92,7 +92,29 @@ export async function makeMove(
           status: isWin ? "FINISHED" : room.status,
         },
       }),
-    ]);
+    ];
+
+    // If winner, update user stats for all players in the game
+    if (isWin) {
+      // Increment gamesPlayed for all players with userId
+      // Increment gamesWon for the winner
+      for (const p of room.players) {
+        if (p.userId) {
+          transactionOps.push(
+            db.user.update({
+              where: { id: p.userId },
+              data: {
+                gamesPlayed: { increment: 1 },
+                ...(p.playerId === player.playerId && { gamesWon: { increment: 1 } }),
+              },
+            })
+          );
+        }
+      }
+    }
+
+    // Execute transaction
+    await db.$transaction(transactionOps);
 
     return { success: true };
   } catch (error) {

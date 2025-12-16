@@ -60,6 +60,7 @@ model Account {
   providerId            String // "github", "google", etc.
   accessToken           String?
   refreshToken          String?
+  idToken               String? // ID token from OAuth provider (Google, etc.)
   accessTokenExpiresAt  DateTime?
   refreshTokenExpiresAt DateTime?
   scope                 String?
