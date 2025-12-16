@@ -12,31 +12,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createGameRoom } from "@/lib/actions/game-room";
-import type { GameSnapshot } from "@/types/game";
-
-// Helper to create initial game state with host player
-function createInitialGameState(): GameSnapshot {
-  // Create the host player (Player 1 - Red)
-  const hostPlayer = {
-    id: 0 as const,
-    row: 5,
-    col: 0,
-    goalSide: "RIGHT" as const,
-    wallsLeft: 6,
-    color: "#ef4444",
-    label: "P1",
-    name: "Player 1 (You)",
-  };
-
-  return {
-    players: [hostPlayer],
-    blockedEdges: [],
-    barriers: [],
-    currentPlayerId: 0,
-    winner: null,
-  };
-}
+import { createRoom } from "@/lib/actions/room-actions";
 
 interface CreateRoomProps {
   onCancel: () => void;
@@ -54,14 +30,14 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
     setError(null);
 
     try {
-      const initialState = createInitialGameState();
-      const result = await createGameRoom(initialState);
-      console.log("🚪 [CreateRoom] createGameRoom result:", result);
+      const result = await createRoom();
 
-      if (result.error) {
+      if ("error" in result) {
         setError(result.error);
-      } else if (result.roomCode) {
-        setRoomCode(result.roomCode);
+      } else {
+        setRoomCode(result.code);
+        // Store player ID in sessionStorage
+        sessionStorage.setItem(`room_${result.code}_playerId`, String(result.playerId));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create room");
@@ -84,10 +60,7 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
 
   const handleContinue = () => {
     if (roomCode) {
-      // Store player ID in sessionStorage (tab-specific, not shared across tabs)\n      sessionStorage.setItem(`room_${roomCode}_playerId`, "0");
-
-      // Navigate to lobby with isHost=true query param
-      router.push(`/room/${roomCode}/lobby?isHost=true`);
+      router.push(`/room/${roomCode}/lobby`);
     }
   };
 

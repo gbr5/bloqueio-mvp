@@ -12,7 +12,7 @@
 
 import { useState, useRef, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { loadGameRoom, joinGameRoom } from "@/lib/actions/game-room";
+import { joinRoom } from "@/lib/actions/room-actions";
 
 interface JoinRoomProps {
   onCancel: () => void;
@@ -76,28 +76,24 @@ export function JoinRoom({ onCancel }: JoinRoomProps) {
     setError(null);
 
     try {
-      // Verify room exists and is joinable
-      const roomResult = await loadGameRoom(roomCode);
+      const result = await joinRoom(roomCode);
 
-      if (roomResult.error || !roomResult.room) {
-        throw new Error("Room not found");
+      if ("error" in result) {
+        setError(result.error);
+        setJoining(false);
+        return;
       }
 
-      const room = roomResult.room;
+      // Store player ID in sessionStorage
+      sessionStorage.setItem(`room_${roomCode}_playerId`, String(result.playerId));
 
-      // Check if room is full or already started
-      if (room.game_state.players.length >= 4) {
-        throw new Error("Room is full");
-      }
-
-      if (room.status === "playing" || room.status === "finished") {
-        throw new Error("Game already started");
-      }
-
-      // Join the room (adds player to database)
-      const joinResult = await joinGameRoom(roomCode);
-
-      if (joinResult.error) {
+      // Navigate to lobby
+      router.push(`/room/${roomCode}/lobby`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to join room");
+      setJoining(false);
+    }
+  };
         throw new Error(joinResult.error);
       }
 

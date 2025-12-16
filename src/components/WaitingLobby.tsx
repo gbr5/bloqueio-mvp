@@ -10,64 +10,57 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { loadGameRoom, startGame } from "@/lib/actions/game-room";
-import type { GameRoom } from "@/types/game";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { getRoomState, startGame } from "@/lib/actions/room-actions";
+import type { Player, Barrier, Room } from "@prisma/client";
 
 interface WaitingLobbyProps {
   roomCode: string;
-  isHost: boolean;
-  initialRoom: GameRoom;
 }
 
-export function WaitingLobby({
-  roomCode,
-  isHost,
-  initialRoom,
-}: WaitingLobbyProps) {
+type RoomWithPlayers = Room & {
+  players: Player[];
+  barriers: Barrier[];
+};
+
+export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [room, setRoom] = useState<GameRoom>(initialRoom);
+  const [room, setRoom] = useState<RoomWithPlayers | null>(null);
+  const [myPlayerId, setMyPlayerId] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Store player ID in sessionStorage if provided in URL (from auto-join)
+  const isHost = room?.hostId === myPlayerId?.toString();
+
+  // Initial load and polling
   useEffect(() => {
-    const playerIdFromUrl = searchParams.get("playerId");
-    if (playerIdFromUrl) {
-      sessionStorage.setItem(`room_${roomCode}_playerId`, playerIdFromUrl);
-      console.log(
-        "💾 [WaitingLobby] Stored player ID from URL:",
-        playerIdFromUrl
-      );
-    }
-  }, [roomCode, searchParams]);
+    const loadRoom = async () => {
+      const result = await getRoomState(roomCode);
 
-  // Poll for room updates every 2 seconds
-  useEffect(() => {
-    const pollInterval = setInterval(async () => {
-      try {
-        const result = await loadGameRoom(roomCode);
-        if (result.room) {
-          setRoom(result.room);
-
-          // If game started, navigate to game page
-          if (result.room.status === "playing") {
-            router.push(`/room/${roomCode}/game`);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to poll room:", error);
+      if ("error" in result) {
+        console.error("Failed to load room:", result.error);
+        return;
       }
-    }, 2000);
 
-    return () => clearInterval(pollInterval);
+      setRoom(result.room);
+      setMyPlayerId(result.myPlayerId);
+      setLoading(false);
+
+      // If game started, navigate to game page
+      if (result.room.status === "PLAYING") {
+        router.push(`/room/${roomCode}/game`);
+      }
+    };
+
+    loadRoom();
+    const interval = setInterval(loadRoom, 2000);
+
+    return () => clearInterval(interval);
   }, [roomCode, router]);
 
-  const players = room.game_state.players;
-  const playerCount = useMemo(() => (players ? players.length : 0), [players]);
+  const playerCount = room?.players.length || 0;
 
   // Loading state - show spinner while room loads
   if (loading || !room) {
@@ -113,11 +106,20 @@ export function WaitingLobby({
     try {
       const result = await startGame(roomCode);
 
-      if (result.error) {
+      if ("error" in result) {
         alert(result.error);
         setLoading(false);
         return;
       }
+
+      // Navigate to game (polling will handle this, but navigate immediately)
+      router.push(`/room/${roomCode}/game`);
+    } catch (error) {
+      console.error("Failed to start game:", error);
+      alert("Failed to start game");
+      setLoading(false);
+    }
+  };
 
       console.log("✅ [WaitingLobby] Game started, navigating to game board");
 
@@ -192,10 +194,9 @@ export function WaitingLobby({
             Players ({playerCount}/4)
           </h2>
           <div className="space-y-3">
-            {players &&
-              players.map((player) => (
-                <div
-                  key={player.id}
+            {room?.players.map((player) => (
+              <div
+                key={player.id}
                   className="flex items-center gap-3 p-3 bg-slate-900/50 rounded-lg"
                 >
                   {/* Color indicator */}
@@ -210,9 +211,16 @@ export function WaitingLobby({
                   </span>
 
                   {/* Host badge */}
-                  {player.id === room.host_player_id && (
+                  {player.playerId === 0 && (
                     <span className="px-2 py-1 bg-yellow-600 text-xs font-semibold rounded text-white">
                       HOST
+                    </span>
+                  )}
+
+                  {/* You badge */}
+                  {player.playerId === myPlayerId && (
+                    <span className="px-2 py-1 bg-green-600 text-xs font-semibold rounded text-white">
+                      YOU
                     </span>
                   )}
                 </div>
