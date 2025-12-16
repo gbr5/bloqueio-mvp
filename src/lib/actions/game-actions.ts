@@ -135,10 +135,22 @@ export async function placeBarrier(
       return { error: "Not your turn" };
     }
 
-    // TODO: Add barrier validation logic here
-    // - Check if barrier overlaps with existing barriers
-    // - Check if barrier completely blocks any player's path to goal
-    // For now, we'll allow any placement
+    // Validate barrier placement
+    // 1. Cannot place on border cells (row/col 0 or 10 for 11x11 grid)
+    const GRID_SIZE = 11;
+    if (row === 0 || row >= GRID_SIZE - 2 || col === 0 || col >= GRID_SIZE - 2) {
+      return { error: "Cannot place barriers on border cells" };
+    }
+
+    // 2. Check if barrier overlaps with existing barriers
+    const overlaps = room.barriers.some(
+      (b) => b.row === row && b.col === col && b.orientation === orientation
+    );
+    if (overlaps) {
+      return { error: "Barrier already exists at this position" };
+    }
+
+    // TODO: Add pathfinding validation to ensure no player is completely blocked
 
     // Place barrier in transaction
     await db.$transaction([

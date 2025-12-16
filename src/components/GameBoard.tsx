@@ -32,7 +32,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
   const [myPlayerId, setMyPlayerId] = useState<number | null>(null);
   const [showGameOver, setShowGameOver] = useState(false);
 
-  // Poll for game state updates
+  // Poll for game state updates - ONLY when waiting for opponent
   useEffect(() => {
     const loadRoom = async () => {
       const result = await getRoomState(roomCode);
@@ -56,11 +56,17 @@ export function GameBoard({ roomCode }: GameBoardProps) {
       }
     };
 
-    loadRoom();
-    const interval = setInterval(loadRoom, 1000); // 1s polling for game
+    loadRoom(); // Initial load
+
+    // Only poll when it's NOT your turn (waiting for opponent)
+    const interval = setInterval(() => {
+      if (room && myPlayerId !== null && room.currentTurn !== myPlayerId) {
+        loadRoom();
+      }
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [roomCode, router, showGameOver]);
+  }, [roomCode, router, showGameOver, room, myPlayerId]);
 
   // Convert Prisma models to GameSnapshot format
   const gameState: GameSnapshot | null = room
@@ -107,11 +113,12 @@ export function GameBoard({ roomCode }: GameBoardProps) {
 
       if ("error" in result) {
         alert(result.error);
-        // Refresh to get correct state
-        const refreshResult = await getRoomState(roomCode);
-        if (!("error" in refreshResult)) {
-          setRoom(refreshResult.room);
-        }
+      }
+      
+      // Immediately refresh state to show the result
+      const refreshResult = await getRoomState(roomCode);
+      if (!("error" in refreshResult)) {
+        setRoom(refreshResult.room);
       }
     } else if (placedBarrier) {
       // Place barrier
@@ -127,11 +134,12 @@ export function GameBoard({ roomCode }: GameBoardProps) {
 
       if ("error" in result) {
         alert(result.error);
-        // Refresh to get correct state
-        const refreshResult = await getRoomState(roomCode);
-        if (!("error" in refreshResult)) {
-          setRoom(refreshResult.room);
-        }
+      }
+      
+      // Immediately refresh state to show the result
+      const refreshResult = await getRoomState(roomCode);
+      if (!("error" in refreshResult)) {
+        setRoom(refreshResult.room);
       }
     }
   };

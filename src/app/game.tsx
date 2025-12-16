@@ -348,10 +348,21 @@ export default function BloqueioPage({
       };
     }
 
-    // Barreiras podem encostar na faixa colorida,
-    // então baseRow/baseCol vão de 0 até SIZE-2.
-    const baseRow = Math.max(0, Math.min(clickRow, SIZE - 2));
-    const baseCol = Math.max(0, Math.min(clickCol, SIZE - 2));
+    // Barriers CANNOT be placed on border cells (row/col 0 or SIZE-1)
+    // Barriers must be at least 1 cell away from borders
+    if (clickRow === 0 || clickRow >= SIZE - 2 || clickCol === 0 || clickCol >= SIZE - 2) {
+      if (!silent) alert("Não é permitido colocar barreiras nas bordas coloridas.");
+      return {
+        ok: false,
+        baseRow: 0,
+        baseCol: 0,
+        orientation: wallOrientation,
+        edgesToAdd: [],
+      };
+    }
+
+    const baseRow = Math.max(1, Math.min(clickRow, SIZE - 3));
+    const baseCol = Math.max(1, Math.min(clickCol, SIZE - 3));
 
     const edgesToAdd: string[] = [];
     const orientation = wallOrientation;
