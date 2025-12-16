@@ -158,15 +158,17 @@ export async function placeBarrier(
     }
 
     // Validate barrier placement
-    // 1. Cannot place on border cells (row/col 0 or 10 for 11x11 grid)
+    // Barriers are placed at intersections and span 2 cells
+    // For an 11x11 grid (0-10):
+    // - Horizontal barrier at (row, col) blocks edges between (row,col)↔(row+1,col) and (row,col+1)↔(row+1,col+1)
+    // - Vertical barrier at (row, col) blocks edges between (row,col)↔(row,col+1) and (row+1,col)↔(row+1,col+1)
+    // Valid range for both row and col: 1 to 8 (needs row+1 and col+1 to be valid internal cells)
     const GRID_SIZE = 11;
-    if (
-      row === 0 ||
-      row >= GRID_SIZE - 2 ||
-      col === 0 ||
-      col >= GRID_SIZE - 2
-    ) {
-      return { error: "Cannot place barriers on border cells" };
+    const MIN_POS = 1;
+    const MAX_POS = GRID_SIZE - 3; // 8 for 11x11 grid
+
+    if (row < MIN_POS || row > MAX_POS || col < MIN_POS || col > MAX_POS) {
+      return { error: "Cannot place barriers at this position" };
     }
 
     // 2. Check if EXACT same barrier already exists (same position + orientation)

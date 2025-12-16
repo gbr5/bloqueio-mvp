@@ -9,9 +9,10 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
+import { playTurnSound } from "@/lib/sounds";
 import { getRoomState } from "@/lib/actions/room-actions";
 import { makeMove, placeBarrier, undoLastAction } from "@/lib/actions/game-actions";
 import { getAdaptiveInterval } from "@/config/polling";
@@ -35,6 +36,9 @@ export function GameBoard({ roomCode }: GameBoardProps) {
   const [showGameOver, setShowGameOver] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
+
+  // Track previous turn to detect when it becomes player's turn
+  const prevTurnRef = useRef<number | null>(null);
 
   // Poll for game state updates - ONLY when waiting for opponent
   useEffect(() => {
@@ -102,6 +106,21 @@ export function GameBoard({ roomCode }: GameBoardProps) {
       if (intervalId) clearInterval(intervalId);
     };
   }, [roomCode, router, showGameOver, room, myPlayerId]);
+
+  // Play sound when it becomes the player's turn
+  useEffect(() => {
+    if (room && myPlayerId !== null) {
+      const isMyTurn = room.currentTurn === myPlayerId;
+      const wasMyTurn = prevTurnRef.current === myPlayerId;
+
+      // Play sound only when turn CHANGES to player's turn (not on initial load)
+      if (isMyTurn && !wasMyTurn && prevTurnRef.current !== null) {
+        playTurnSound();
+      }
+
+      prevTurnRef.current = room.currentTurn;
+    }
+  }, [room?.currentTurn, myPlayerId, room]);
 
   // Helper function to compute blocked edges from barriers
   const computeBlockedEdges = (barriers: Barrier[]): string[] => {

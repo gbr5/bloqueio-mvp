@@ -2,6 +2,13 @@
 
 import { JSX, useState, useEffect } from "react";
 import { toast } from "@/lib/toast";
+import {
+  Modal,
+  ModalHeader,
+  ModalTitle,
+  ModalDescription,
+  ModalFooter,
+} from "@/components/Modal";
 import type {
   PlayerId,
   GoalSide,
@@ -371,6 +378,15 @@ export default function BloqueioPage({
   const [wallOrientation, setWallOrientation] = useState<Orientation>("H");
   const [hoveredCell, setHoveredCell] = useState<Cell | null>(null);
 
+  // Barrier confirmation state
+  const [pendingBarrier, setPendingBarrier] = useState<{
+    baseRow: number;
+    baseCol: number;
+    orientation: Orientation;
+    edgesToAdd: string[];
+  } | null>(null);
+  const [showBarrierConfirmation, setShowBarrierConfirmation] = useState(false);
+
   const currentPlayer = players.find((p) => p.id === currentPlayerId)!;
 
   // Helper to update game state (works for both controlled and uncontrolled)
@@ -482,16 +498,16 @@ export default function BloqueioPage({
       };
     }
 
-    // Barriers CANNOT be placed ON the colored border cells (row/col 0 or SIZE-1)
-    // But barriers CAN block the edge between border and internal board
-    // Click must be on internal cells (1 to SIZE-2), not on borders
+    // Barriers are placed by clicking on internal cells (1 to SIZE-2)
+    // The click determines the base position for the barrier
+    // Border cells (0 or SIZE-1) cannot be clicked to place barriers
     if (
       clickRow === 0 ||
       clickRow === SIZE - 1 ||
       clickCol === 0 ||
       clickCol === SIZE - 1
     ) {
-      if (!silent) toast.error("Cannot place barriers on border cells");
+      // Silently ignore clicks on border cells - no error needed
       return {
         ok: false,
         baseRow: 0,
@@ -699,6 +715,16 @@ export default function BloqueioPage({
 
     const { baseRow, baseCol, orientation, edgesToAdd } = result;
 
+    // Set pending barrier and show confirmation modal
+    setPendingBarrier({ baseRow, baseCol, orientation, edgesToAdd });
+    setShowBarrierConfirmation(true);
+  }
+
+  function confirmBarrierPlacement() {
+    if (!pendingBarrier) return;
+
+    const { baseRow, baseCol, orientation, edgesToAdd } = pendingBarrier;
+
     pushSnapshot();
 
     const newBlocked = new Set(blockedEdges);
@@ -722,6 +748,16 @@ export default function BloqueioPage({
       barriers: [...barriers, newBarrier],
       currentPlayerId: nextPlayerId(currentPlayerId),
     });
+
+    // Reset state
+    setPendingBarrier(null);
+    setShowBarrierConfirmation(false);
+    setMode("move"); // Reset to move mode after placing barrier
+  }
+
+  function cancelBarrierPlacement() {
+    setPendingBarrier(null);
+    setShowBarrierConfirmation(false);
   }
 
   function handleRestart() {
@@ -862,14 +898,21 @@ export default function BloqueioPage({
   const barrierOverlays: JSX.Element[] = [];
   const cellPercent = 100 / SIZE;
 
-  function renderBarrier(b: Barrier, opts?: { ghost?: boolean }): JSX.Element {
+  function renderBarrier(
+    b: Barrier,
+    opts?: { ghost?: boolean; pending?: boolean }
+  ): JSX.Element {
     const ghost = opts?.ghost ?? false;
+    const pending = opts?.pending ?? false;
 
     // Get the color of the player who placed the barrier
+    // For pending barriers (confirmation), use amber color
     // For ghost barriers, use current player's color
     // For placed barriers, use the placedBy player's color (fallback to yellow for old barriers)
     let barrierColor: string;
-    if (ghost) {
+    if (pending) {
+      barrierColor = "#f59e0b"; // Amber color for pending confirmation
+    } else if (ghost) {
       barrierColor = currentPlayer.color;
     } else if (b.placedBy !== undefined) {
       const placer = players.find((p) => p.id === b.placedBy);
@@ -878,10 +921,12 @@ export default function BloqueioPage({
       barrierColor = "#facc15"; // Default yellow for backwards compatibility
     }
 
-    // Create rgba version for ghost barriers
+    // Create rgba version for ghost/pending barriers
+    // Pending barriers are more visible (60% opacity) than ghost (40%)
+    const opacity = pending ? "99" : "66";
     const ghostColor = barrierColor.startsWith("#")
-      ? `${barrierColor}66` // Add 40% opacity
-      : barrierColor.replace(")", ", 0.4)").replace("rgb", "rgba");
+      ? `${barrierColor}${opacity}`
+      : barrierColor.replace(")", `, ${pending ? 0.6 : 0.4})`).replace("rgb", "rgba");
 
     if (b.orientation === "H") {
       const top = (b.row + 1) * cellPercent;
@@ -935,9 +980,19 @@ export default function BloqueioPage({
     barrierOverlays.push(renderBarrier(b));
   }
 
-  // barreira fantasma (hover)
+  // barreira fantasma (hover) or pending barrier preview
   let ghostBarrier: JSX.Element | null = null;
-  if (mode === "wall" && hoveredCell) {
+
+  // Show pending barrier in amber during confirmation
+  if (pendingBarrier && showBarrierConfirmation) {
+    const pending: Barrier = {
+      row: pendingBarrier.baseRow,
+      col: pendingBarrier.baseCol,
+      orientation: pendingBarrier.orientation,
+      id: "pending",
+    };
+    ghostBarrier = renderBarrier(pending, { ghost: true, pending: true });
+  } else if (mode === "wall" && hoveredCell) {
     const res = checkWallPlacement(hoveredCell.row, hoveredCell.col, {
       silent: true,
     });
@@ -1119,28 +1174,30 @@ export default function BloqueioPage({
                 >
                   Mover peão
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setMode("wall")}
-                  style={{
-                    padding: "0.4rem 0.8rem",
-                    borderRadius: 999,
-                    border:
-                      mode === "wall"
-                        ? "2px solid #facc15"
-                        : "1px solid #1f2937",
-                    background:
-                      mode === "wall"
-                        ? "rgba(250,204,21,0.15)"
-                        : "rgba(15,23,42,0.9)",
-                    color: "#e5e7eb",
-                    fontSize: "0.85rem",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Colocar barreira
-                </button>
+                {currentPlayer.wallsLeft > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setMode("wall")}
+                    style={{
+                      padding: "0.4rem 0.8rem",
+                      borderRadius: 999,
+                      border:
+                        mode === "wall"
+                          ? "2px solid #facc15"
+                          : "1px solid #1f2937",
+                      background:
+                        mode === "wall"
+                          ? "rgba(250,204,21,0.15)"
+                          : "rgba(15,23,42,0.9)",
+                      color: "#e5e7eb",
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Colocar barreira ({currentPlayer.wallsLeft})
+                  </button>
+                )}
                 {!isControlled && (
                   <button
                     type="button"
@@ -1302,6 +1359,92 @@ export default function BloqueioPage({
           </aside>
         </section>
       </div>
+
+      {/* Barrier Confirmation Modal */}
+      <Modal
+        open={showBarrierConfirmation}
+        onOpenChange={(open) => {
+          if (!open) cancelBarrierPlacement();
+        }}
+        ariaLabel="Confirm barrier placement"
+      >
+        <ModalHeader>
+          <ModalTitle>Confirmar barreira</ModalTitle>
+          <ModalDescription>
+            {pendingBarrier?.orientation === "H"
+              ? "Barreira horizontal"
+              : "Barreira vertical"}{" "}
+            na posição ({pendingBarrier?.baseRow}, {pendingBarrier?.baseCol})
+          </ModalDescription>
+        </ModalHeader>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            padding: "1rem",
+            background: "rgba(245, 158, 11, 0.1)",
+            borderRadius: "0.5rem",
+            border: "1px solid rgba(245, 158, 11, 0.3)",
+            marginBottom: "0.5rem",
+          }}
+        >
+          <div
+            style={{
+              width: pendingBarrier?.orientation === "H" ? 48 : 8,
+              height: pendingBarrier?.orientation === "H" ? 8 : 48,
+              background: "#f59e0b",
+              borderRadius: 4,
+              boxShadow: "0 0 10px #f59e0b",
+            }}
+          />
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: "0.9rem", color: "#e5e7eb" }}>
+              Você tem <strong>{currentPlayer.wallsLeft}</strong> barreira
+              {currentPlayer.wallsLeft !== 1 ? "s" : ""} restante
+              {currentPlayer.wallsLeft !== 1 ? "s" : ""}.
+            </p>
+            <p style={{ fontSize: "0.8rem", color: "#9ca3af", marginTop: 4 }}>
+              A barreira está destacada em âmbar no tabuleiro.
+            </p>
+          </div>
+        </div>
+
+        <ModalFooter>
+          <button
+            type="button"
+            onClick={cancelBarrierPlacement}
+            style={{
+              padding: "0.6rem 1.2rem",
+              borderRadius: "0.5rem",
+              border: "1px solid #374151",
+              background: "transparent",
+              color: "#9ca3af",
+              fontSize: "0.9rem",
+              cursor: "pointer",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={confirmBarrierPlacement}
+            style={{
+              padding: "0.6rem 1.2rem",
+              borderRadius: "0.5rem",
+              border: "none",
+              background: "#f59e0b",
+              color: "#000",
+              fontSize: "0.9rem",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Confirmar
+          </button>
+        </ModalFooter>
+      </Modal>
     </main>
   );
 }
