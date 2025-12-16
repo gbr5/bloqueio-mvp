@@ -4,9 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
+    "postinstall": "prisma generate",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
@@ -18,15 +22,19 @@
     "react-dom": "19.2.0"
   },
   "devDependencies": {
+    "@jest/globals": "^29.7.0",
     "@tailwindcss/postcss": "^4",
+    "@types/jest": "^29.5.11",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
+    "jest": "^29.7.0",
     "prisma": "5",
     "tailwindcss": "^4",
+    "ts-jest": "^29.1.1",
     "tsx": "^4.21.0",
     "typescript": "^5"
   }
