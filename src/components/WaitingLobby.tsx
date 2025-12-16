@@ -1,63 +1,95 @@
 /**
  * WaitingLobby Component
  *
- * Displays room information and players:
- * - Polls database every 2 seconds for updates
- * - Shows room code and player list
- * - Host can start game when 2+ players
- * - All players can leave room
+ * Shows all players in the room and allows the host to start the game.
+ * Polls database for real-time updates.
  */
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { loadGameRoom, startGame } from "@/lib/actions/game-room";
-import type { GameRoom } from "@/types/game";
+import { getRoomState } from "@/lib/actions/room-actions";
+import { startGame } from "@/lib/actions/game-actions";
+import type { Room, Player } from "@prisma/client";
 
 interface WaitingLobbyProps {
   roomCode: string;
-  isHost: boolean;
-  initialRoom: GameRoom;
 }
 
-export function WaitingLobby({
-  roomCode,
-  isHost,
-  initialRoom,
-}: WaitingLobbyProps) {
+type RoomWithPlayers = Room & {
+  players: Player[];
+};
+
+export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
   const router = useRouter();
-  const [room, setRoom] = useState<GameRoom>(initialRoom);
-  const [copied, setCopied] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [room, setRoom] = useState<RoomWithPlayers | null>(null);
+  const [myPlayerId, setMyPlayerId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Poll for room updates every 2 seconds
+  // Poll for room updates
   useEffect(() => {
-    const pollInterval = setInterval(async () => {
-      try {
-        const result = await loadGameRoom(roomCode);
-        if (result.room) {
-          setRoom(result.room);
+    const loadRoom = async () => {
+      const result = await getRoomState(roomCode);
 
-          // If game started, navigate to game page
-          if (result.room.status === "playing") {
-            router.push(`/room/${roomCode}/game`);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to poll room:", error);
+      if ("error" in result) {
+        setError(result.error || "Failed to load room");
+        setLoading(false);
+        return;
       }
-    }, 2000);
 
-    return () => clearInterval(pollInterval);
+      setRoom(result.room);
+      setMyPlayerId(result.myPlayerId);
+      setLoading(false);
+
+      // If game started, navigate to game page
+      if (result.room.status === "PLAYING") {
+        router.push(`/room/${roomCode}/game`);
+      }
+    };
+
+    loadRoom();
+    const interval = setInterval(loadRoom, 2000); // 2s polling for lobby
+
+    return () => clearInterval(interval);
   }, [roomCode, router]);
 
-  const players = room.game_state.players;
-  const playerCount = useMemo(() => (players ? players.length : 0), [players]);
+  const handleStartGame = async () => {
+    if (!room) return;
 
-  // Loading state - show spinner while room loads
-  if (loading || !room) {
+    setStarting(true);
+
+    try {
+      const result = await startGame(roomCode);
+
+      if ("error" in result) {
+        alert(result.error);
+        setStarting(false);
+        return;
+      }
+
+      // Navigation will happen automatically via polling
+    } catch (error) {
+      console.error("Failed to start game:", error);
+      alert("Failed to start game");
+      setStarting(false);
+    }
+  };
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(roomCode);
+    // Could add a toast notification here
+  };
+
+  const handleLeaveRoom = () => {
+    // Clear session storage
+    sessionStorage.removeItem(`room_${roomCode}_playerId`);
+    router.push("/");
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
         <div className="text-center">
@@ -68,206 +100,145 @@ export function WaitingLobby({
     );
   }
 
-  const handleCopyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(roomCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  };
+  if (error || !room) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">{error || "Room not found"}</p>
+          <button
+            onClick={() => router.push("/")}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+          >
+            Return Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  const handleCopyLink = async () => {
-    const url = `${window.location.origin}/room/${roomCode}/lobby`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy link:", err);
-    }
-  };
-
-  const handleStartGame = async () => {
-    if (playerCount < 2) {
-      alert("Need at least 2 players to start");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const result = await startGame(roomCode);
-
-      if (result.error) {
-        alert(result.error);
-        setLoading(false);
-        return;
-      }
-
-      console.log("✅ [WaitingLobby] Game started, navigating to game board");
-
-      // Navigate to game board
-      router.push(`/room/${roomCode}/game`);
-    } catch (error) {
-      console.error("Failed to start game:", error);
-      alert("Failed to start game");
-      setLoading(false);
-    }
-  };
-
-  const handleLeave = () => {
-    router.push("/");
-  };
-
+  const isHost = myPlayerId === 0;
+  const playerCount = room.players.length;
   const canStart = isHost && playerCount >= 2 && playerCount <= 4;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
-      <div className="w-full max-w-2xl px-8">
-        <h1 className="text-4xl font-bold text-center mb-8 text-white">
-          Waiting Lobby
-        </h1>
-
-        {/* Room Code Display */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 mb-6">
-          <div className="text-center space-y-4">
-            <div>
-              <p className="text-slate-400 text-sm mb-2">Room Code</p>
-              <div className="flex items-center justify-center gap-3">
-                <p className="text-4xl font-mono font-bold text-blue-400 tracking-widest">
-                  {roomCode}
-                </p>
-                <button
-                  onClick={handleCopyCode}
-                  className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors text-sm"
-                >
-                  {copied ? "✓ Copied" : "📋 Copy"}
-                </button>
-              </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black p-4">
+      <div className="w-full max-w-2xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-white mb-4">Waiting Lobby</h1>
+          <div className="flex items-center justify-center gap-4">
+            <div className="bg-slate-800 border border-slate-600 rounded-lg px-6 py-3">
+              <p className="text-sm text-slate-400 mb-1">Room Code</p>
+              <p className="text-3xl font-mono font-bold text-white tracking-wider">
+                {roomCode}
+              </p>
             </div>
-
-            <div className="border-t border-slate-700 pt-4">
-              <button
-                onClick={handleCopyLink}
-                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
-              >
-                {copiedLink ? (
-                  <>
-                    <span>✓</span>
-                    <span>Link Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🔗</span>
-                    <span>Copy Room Link</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            <p className="text-slate-500 text-xs">
-              Share the code or link with friends to invite them
-            </p>
+            <button
+              onClick={handleCopyCode}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-semibold"
+            >
+              Copy Code
+            </button>
           </div>
         </div>
 
-        {/* Players List */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold text-white mb-4">
-            Players ({playerCount}/4)
-          </h2>
+        {/* Player List */}
+        <div className="bg-slate-800/90 border border-slate-700 rounded-xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-white">
+              Players ({playerCount}/4)
+            </h2>
+            {playerCount < 2 && (
+              <p className="text-sm text-yellow-400">Need at least 2 players</p>
+            )}
+          </div>
+
           <div className="space-y-3">
-            {players &&
-              players.map((player) => (
+            {room.players.map((player) => (
+              <div
+                key={player.playerId}
+                className="flex items-center gap-4 p-4 bg-slate-900/50 border border-slate-700 rounded-lg"
+              >
                 <div
-                  key={player.id}
-                  className="flex items-center gap-3 p-3 bg-slate-900/50 rounded-lg"
-                >
-                  {/* Color indicator */}
-                  <div
-                    className="w-8 h-8 rounded-full border-2 border-white"
-                    style={{ backgroundColor: player.color }}
-                  />
-
-                  {/* Player name */}
-                  <span className="text-white font-medium flex-1">
-                    {player.name}
-                  </span>
-
-                  {/* Host badge */}
-                  {player.id === room.host_player_id && (
-                    <span className="px-2 py-1 bg-yellow-600 text-xs font-semibold rounded text-white">
+                  className="w-12 h-12 rounded-full border-2 border-white shrink-0"
+                  style={{ backgroundColor: player.color }}
+                />
+                <div className="flex-1">
+                  <p className="text-white font-semibold">{player.name}</p>
+                  <p className="text-sm text-slate-400">Player {player.playerId + 1}</p>
+                </div>
+                <div className="flex gap-2">
+                  {player.playerId === myPlayerId && (
+                    <span className="px-3 py-1 bg-blue-600/30 border border-blue-500 text-blue-300 text-xs font-semibold rounded-full">
+                      YOU
+                    </span>
+                  )}
+                  {player.playerId === 0 && (
+                    <span className="px-3 py-1 bg-yellow-600/30 border border-yellow-500 text-yellow-300 text-xs font-semibold rounded-full">
                       HOST
                     </span>
                   )}
                 </div>
-              ))}
+              </div>
+            ))}
 
             {/* Empty slots */}
-            {Array.from({ length: 4 - playerCount }).map((_, i) => (
+            {[...Array(4 - playerCount)].map((_, i) => (
               <div
                 key={`empty-${i}`}
-                className="flex items-center gap-3 p-3 bg-slate-900/20 rounded-lg border border-dashed border-slate-700"
+                className="flex items-center gap-4 p-4 border-2 border-dashed border-slate-700 rounded-lg opacity-50"
               >
-                <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700" />
-                <span className="text-slate-600 italic">
-                  Waiting for player...
-                </span>
+                <div className="w-12 h-12 rounded-full bg-slate-700 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-slate-500">Waiting for player...</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Game Info */}
-        <div className="bg-blue-900/20 border border-blue-800 rounded-lg p-4 mb-6">
-          <p className="text-blue-200 text-sm text-center">
-            {playerCount < 2 && "Waiting for at least 2 players to start..."}
-            {playerCount >= 2 &&
-              playerCount < 4 &&
-              "Ready to start! More players can join until game begins."}
-            {playerCount === 4 && "Room is full! Ready to start."}
-          </p>
-        </div>
-
         {/* Actions */}
         <div className="space-y-3">
-          {isHost && (
+          {isHost ? (
             <button
               onClick={handleStartGame}
-              disabled={!canStart || loading}
-              className="w-full py-4 px-6 bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200 shadow-lg"
+              disabled={!canStart || starting}
+              className="w-full py-4 px-6 bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:cursor-not-allowed text-white font-bold text-lg rounded-lg transition-colors duration-200 flex items-center justify-center gap-3"
             >
-              {loading
-                ? "Starting..."
-                : canStart
-                ? "Start Game"
-                : "Waiting for players..."}
+              {starting ? (
+                <>
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white" />
+                  <span>Starting Game...</span>
+                </>
+              ) : (
+                <>
+                  <span>🎮</span>
+                  <span>Start Game</span>
+                </>
+              )}
             </button>
-          )}
-
-          {!isHost && (
-            <div className="py-4 px-6 bg-slate-800 border border-slate-700 text-center text-slate-300 rounded-lg">
-              Waiting for host to start the game...
+          ) : (
+            <div className="w-full py-4 px-6 bg-slate-700/50 border border-slate-600 text-slate-400 font-semibold text-center rounded-lg">
+              Waiting for host to start...
             </div>
           )}
 
           <button
-            onClick={handleLeave}
-            disabled={loading}
+            onClick={handleLeaveRoom}
+            disabled={starting}
             className="w-full py-3 px-6 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg transition-colors duration-200"
           >
             Leave Room
           </button>
         </div>
 
-        {/* Connection Status */}
-        <div className="mt-6 text-center">
-          <div className="inline-flex items-center gap-2 text-sm text-slate-500">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span>Connected</span>
-          </div>
+        {/* Instructions */}
+        <div className="mt-6 p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
+          <p className="text-sm text-slate-400 text-center">
+            {isHost
+              ? "Share the room code with friends. Start when everyone is ready!"
+              : "Waiting for the host to start the game..."}
+          </p>
         </div>
       </div>
     </div>

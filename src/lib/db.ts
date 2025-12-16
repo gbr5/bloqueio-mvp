@@ -1,42 +1,30 @@
 /**
- * Database Client Wrapper
+ * Prisma Database Client
  *
- * Provides a unified SQL interface that works in both:
- * - Local development (Docker Postgres via postgres.js)
- * - Production (Neon via @neondatabase/serverless)
+ * Provides type-safe database access using Prisma ORM
+ * Works with both local and production Neon PostgreSQL
  *
  * Usage:
- *   import { sql } from '@/lib/db';
- *   const rooms = await sql`SELECT * FROM game_rooms`;
+ *   import { db } from '@/lib/db';
+ *   const rooms = await db.room.findMany();
  */
 
-import postgres from "postgres";
-import { neon } from "@neondatabase/serverless";
+import { PrismaClient } from "@prisma/client";
 
-/**
- * Determine which SQL client to use based on environment
- *
- * - Local development: Use postgres.js (works with Docker Postgres)
- * - Vercel Edge/Serverless: Use Neon serverless driver
- */
-const isProduction = process.env.VERCEL_ENV === "production";
-const isVercel = process.env.VERCEL === "1";
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
 
-/**
- * SQL client - auto-selects based on environment
- *
- * In development: postgres.js connects to local Docker Postgres
- * In production: Neon serverless driver connects to Neon database
- */
-export const sql =
-  isVercel && isProduction
-    ? neon(process.env.DATABASE_URL!)
-    : postgres(process.env.DATABASE_URL!, {
-        // Local development options
-        max: 10, // Connection pool size
-        idle_timeout: 20, // Close idle connections after 20s
-        connect_timeout: 10, // Timeout after 10s if can't connect
-      });
+export const db =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["query", "error", "warn"]
+        : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
 
 /**
  * Type-safe query helpers
@@ -45,7 +33,7 @@ export const sql =
 /** Check database connection */
 export async function testConnection(): Promise<boolean> {
   try {
-    await sql`SELECT 1`;
+    await db.$queryRaw`SELECT 1`;
     return true;
   } catch (error) {
     console.error("Database connection failed:", error);
@@ -54,11 +42,8 @@ export async function testConnection(): Promise<boolean> {
 }
 
 /**
- * Close database connection (only needed for postgres.js in local dev)
- * No-op for Neon serverless driver
+ * Close database connection
  */
 export async function closeConnection(): Promise<void> {
-  if (!isVercel && "end" in sql) {
-    await (sql as postgres.Sql).end();
-  }
+  await db.$disconnect();
 }

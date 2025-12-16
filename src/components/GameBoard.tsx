@@ -1,166 +1,167 @@
 /**
  * GameBoard Component - Multiplayer Game Interface
  *
- * Wraps the game logic from game.tsx with multiplayer state management:
- * - Loads initial state from database
- * - Polls for updates from other players
- * - Syncs moves to database
- * - Handles turn validation
+ * Wraps the game logic with Prisma-based multiplayer state:
+ * - Polls database for real-time updates
+ * - Syncs moves via server actions
+ * - Validates turns server-side
  */
 
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { loadGameRoom, updateGameRoom } from "@/lib/actions/game-room";
-import type { GameRoom, GameSnapshot } from "@/types/game";
+import { getRoomState } from "@/lib/actions/room-actions";
+import { makeMove, placeBarrier } from "@/lib/actions/game-actions";
+import type { Player, Barrier, Room } from "@prisma/client";
 import BloqueioPage from "@/app/game";
+import type { GameSnapshot } from "@/types/game";
 
 interface GameBoardProps {
   roomCode: string;
-  initialRoom: GameRoom;
 }
 
-export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
+type RoomWithPlayers = Room & {
+  players: Player[];
+  barriers: Barrier[];
+};
+
+export function GameBoard({ roomCode }: GameBoardProps) {
   const router = useRouter();
-  const [gameState, setGameState] = useState<GameSnapshot>(
-    initialRoom.game_state
-  );
+  const [room, setRoom] = useState<RoomWithPlayers | null>(null);
+  const [myPlayerId, setMyPlayerId] = useState<number | null>(null);
   const [showGameOver, setShowGameOver] = useState(false);
-  const [isRestarting, setIsRestarting] = useState(false);
 
-  // Get player ID from localStorage (set during join/create)
-  // Using initializer function to avoid setState in useEffect
-  const [myPlayerId] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null;
-    const storedPlayerId = localStorage.getItem(`room_${roomCode}_playerId`);
-    return storedPlayerId ? parseInt(storedPlayerId, 10) : null;
-  });
-
-  // Poll for game state updates every 2 seconds
+  // Poll for game state updates - ONLY when waiting for opponent
   useEffect(() => {
-    const pollInterval = setInterval(async () => {
-      try {
-        const result = await loadGameRoom(roomCode);
+    const loadRoom = async () => {
+      const result = await getRoomState(roomCode);
 
-        if (result.room) {
-          // Update game state if changed
-          const latestState = result.room.game_state;
-          setGameState(latestState);
-
-          // If game ended, show winner
-          if (latestState.winner !== null && !showGameOver) {
-            console.log("🏆 Winner detected:", latestState.winner);
-            setShowGameOver(true);
-          }
-
-          // If room status changed (e.g., back to waiting), redirect
-          if (result.room.status === "waiting") {
-            router.push(`/room/${roomCode}/lobby`);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to poll game state:", error);
-      }
-    }, 2000);
-
-    return () => clearInterval(pollInterval);
-  }, [roomCode, router, showGameOver]);
-
-  // Sync moves to database (Task 5)
-  // NOTE: Not used yet - BloqueioPage is still local-only for MVP
-  // This function will be called when we make BloqueioPage a controlled component
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleGameStateChange = async (newState: GameSnapshot) => {
-    // Optimistic update
-    setGameState(newState);
-
-    // Sync to database
-    try {
-      const result = await updateGameRoom(roomCode, newState);
-      if (result.error) {
-        console.error("Failed to sync game state:", result.error);
-        // Could rollback here but keeping it simple for MVP
-      }
-    } catch (error) {
-      console.error("Failed to sync game state:", error);
-    }
-  };
-
-  // Play Again - reset game and return to lobby
-  const handlePlayAgain = async () => {
-    setIsRestarting(true);
-
-    try {
-      // Create fresh initial game state with all current players
-      const resetState: GameSnapshot = {
-        players: initialRoom.game_state.players.map((p) => ({
-          ...p,
-          row: p.id === 0 ? 5 : p.id === 1 ? 5 : p.id === 2 ? 5 : 5,
-          col: p.id === 0 ? 0 : p.id === 1 ? 10 : p.id === 2 ? 5 : 5,
-          wallsLeft: 6,
-        })),
-        blockedEdges: [],
-        barriers: [],
-        currentPlayerId: 0,
-        winner: null,
-      };
-
-      // Update room status back to waiting
-      const result = await updateGameRoom(roomCode, resetState, "waiting");
-
-      if (result.error) {
-        console.error("Failed to reset game:", result.error);
-        alert("Failed to reset game. Please try again.");
-        setIsRestarting(false);
+      if ("error" in result) {
+        console.error("Failed to load room:", result.error);
         return;
       }
 
-      // Hide modal and navigate back to lobby
-      setShowGameOver(false);
-      router.push(`/room/${roomCode}/lobby`);
-    } catch (error) {
-      console.error("Failed to reset game:", error);
-      alert("Failed to reset game. Please try again.");
-      setIsRestarting(false);
+      setRoom(result.room);
+      setMyPlayerId(result.myPlayerId);
+
+      // Check for winner
+      if (result.room.winner !== null && !showGameOver) {
+        setShowGameOver(true);
+      }
+
+      // If returned to waiting, go to lobby
+      if (result.room.status === "WAITING") {
+        router.push(`/room/${roomCode}/lobby`);
+      }
+    };
+
+    loadRoom(); // Initial load
+
+    // Only poll when it's NOT your turn (waiting for opponent)
+    const interval = setInterval(() => {
+      if (room && myPlayerId !== null && room.currentTurn !== myPlayerId) {
+        loadRoom();
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [roomCode, router, showGameOver, room, myPlayerId]);
+
+  // Convert Prisma models to GameSnapshot format
+  const gameState: GameSnapshot | null = room
+    ? {
+        players: room.players.map((p) => ({
+          id: p.playerId as 0 | 1 | 2 | 3,
+          row: p.row,
+          col: p.col,
+          goalSide: p.goalSide as "TOP" | "RIGHT" | "BOTTOM" | "LEFT",
+          wallsLeft: p.wallsLeft,
+          color: p.color,
+          label: `P${p.playerId + 1}`,
+          name: p.name,
+        })),
+        barriers: room.barriers.map((b) => ({
+          id: b.id,
+          row: b.row,
+          col: b.col,
+          orientation: b.orientation === "HORIZONTAL" ? ("H" as const) : ("V" as const),
+        })),
+        blockedEdges: [], // Will compute from barriers in game logic
+        currentPlayerId: room.currentTurn as 0 | 1 | 2 | 3,
+        winner: room.winner as (0 | 1 | 2 | 3) | null,
+      }
+    : null;
+
+  // Handle moves from BloqueioPage
+  const handleGameStateChange = async (newState: GameSnapshot) => {
+    if (!room || myPlayerId === null) return;
+
+    const currentPlayer = room.players.find((p) => p.playerId === myPlayerId);
+    const newPlayerState = newState.players.find((p) => p.id === myPlayerId);
+
+    if (!currentPlayer || !newPlayerState) return;
+
+    // Detect if this is a move or barrier placement
+    const movedPosition =
+      currentPlayer.row !== newPlayerState.row || currentPlayer.col !== newPlayerState.col;
+    const placedBarrier = newState.barriers.length > room.barriers.length;
+
+    if (movedPosition) {
+      // Make move
+      const result = await makeMove(roomCode, newPlayerState.row, newPlayerState.col);
+
+      if ("error" in result) {
+        alert(result.error);
+      }
+      
+      // Immediately refresh state to show the result
+      const refreshResult = await getRoomState(roomCode);
+      if (!("error" in refreshResult)) {
+        setRoom(refreshResult.room);
+      }
+    } else if (placedBarrier) {
+      // Place barrier
+      const newBarrier = newState.barriers[newState.barriers.length - 1];
+      const orientation = newBarrier.orientation === "H" ? "HORIZONTAL" : "VERTICAL";
+
+      const result = await placeBarrier(
+        roomCode,
+        newBarrier.row,
+        newBarrier.col,
+        orientation
+      );
+
+      if ("error" in result) {
+        alert(result.error);
+      }
+      
+      // Immediately refresh state to show the result
+      const refreshResult = await getRoomState(roomCode);
+      if (!("error" in refreshResult)) {
+        setRoom(refreshResult.room);
+      }
     }
   };
 
-  const handleGoHome = () => {
-    // Clear localStorage
-    localStorage.removeItem(`room_${roomCode}_playerId`);
-    localStorage.removeItem(`room_${roomCode}_nickname`);
+  if (!room || !gameState) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-slate-400">Loading game...</p>
+        </div>
+      </div>
+    );
+  }
 
-    // Navigate home
-    router.push("/");
-  };
-
-  const handleLeaveGame = () => {
-    if (confirm("Are you sure you want to leave the game?")) {
-      handleGoHome();
-    }
-  };
-
-  // For now, just render the local game (Task 2)
-  // Turn validation and move sync will be Task 4 & 5
-  const isMyTurn =
-    myPlayerId !== null && gameState.currentPlayerId === myPlayerId;
+  const isMyTurn = myPlayerId === room.currentTurn;
 
   return (
     <div className="relative">
-      {/* Leave Game Button */}
-      <div className="absolute top-4 right-4 z-10">
-        <button
-          onClick={handleLeaveGame}
-          className="px-4 py-2 bg-red-900/90 hover:bg-red-800 border border-red-600 text-red-200 rounded-lg transition-colors text-sm font-semibold"
-        >
-          ← Leave Game
-        </button>
-      </div>
-
-      {/* Player info header */}
-      <div className="absolute top-4 left-4 bg-slate-800/90 border border-slate-700 rounded-lg p-4 z-10">
-        <div className="text-white text-sm space-y-2">
+      {/* Game Info Header */}
+      <div className="absolute top-4 left-4 z-10">
+        <div className="bg-slate-800/90 backdrop-blur border border-slate-700 rounded-lg p-4 shadow-lg space-y-2 text-sm">
           <p className="font-semibold">Room: {roomCode}</p>
           {myPlayerId !== null && (
             <p className="text-slate-300">You are: Player {myPlayerId + 1}</p>
@@ -189,24 +190,19 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
         </div>
       </div>
 
-      {/* Multiplayer notice */}
-      {!isMyTurn && gameState.winner === null && (
-        <div className="absolute top-16 right-4 bg-yellow-900/90 border border-yellow-600 rounded-lg p-3 z-10">
-          <p className="text-yellow-200 text-sm">
-            ⚠️ Not your turn - moves won&apos;t sync
-          </p>
-        </div>
-      )}
-
-      {/* Game board - currently local only */}
-      <BloqueioPage />
+      {/* Game board */}
+      <BloqueioPage
+        gameState={gameState}
+        onGameStateChange={handleGameStateChange}
+        myPlayerId={myPlayerId}
+        disabled={!isMyTurn || gameState.winner !== null}
+      />
 
       {/* Game Over Modal */}
       {showGameOver && gameState.winner !== null && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
           <div className="bg-slate-800 border-2 border-slate-700 rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">
             <div className="text-center space-y-6">
-              {/* Winner Announcement */}
               <div className="space-y-2">
                 <div className="text-6xl">🏆</div>
                 <h2 className="text-3xl font-bold text-yellow-400">
@@ -252,42 +248,16 @@ export function GameBoard({ roomCode, initialRoom }: GameBoardProps) {
               {/* Actions */}
               <div className="space-y-3">
                 <button
-                  onClick={handlePlayAgain}
-                  disabled={isRestarting}
-                  className="w-full py-3 px-6 bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200 shadow-lg flex items-center justify-center gap-2"
+                  onClick={() => router.push("/")}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
                 >
-                  {isRestarting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
-                      <span>Restarting...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>🔄</span>
-                      <span>Play Again</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  onClick={handleGoHome}
-                  disabled={isRestarting}
-                  className="w-full py-3 px-6 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg transition-colors duration-200"
-                >
-                  🏠 Back to Home
+                  Return to Home
                 </button>
               </div>
-
-              <p className="text-xs text-slate-500">
-                All players will return to the lobby when you click Play Again
-              </p>
             </div>
           </div>
         </div>
       )}
-
-      {/* Note: Game is local-only for now */}
-      {/* TODO: Make BloqueioPage controlled to sync moves */}
     </div>
   );
 }

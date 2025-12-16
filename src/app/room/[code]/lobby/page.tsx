@@ -2,37 +2,26 @@
  * Waiting Lobby Page - Dynamic Route
  *
  * URL: /room/[code]/lobby
- * Server-side loads room data, client polls for updates
+ * Client polls for updates via getRoomState()
  */
 
 import { WaitingLobby } from "@/components/WaitingLobby";
-import { loadGameRoom } from "@/lib/actions/game-room";
+import { getRoomState } from "@/lib/actions/room-actions";
 import { redirect } from "next/navigation";
 
 interface PageProps {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ isHost?: string }>;
 }
 
-export default async function LobbyPage({ params, searchParams }: PageProps) {
+export default async function LobbyPage({ params }: PageProps) {
   const { code } = await params;
-  const { isHost } = await searchParams;
 
-  // Load room from database
-  const result = await loadGameRoom(code);
-
-  console.log("🚪 [Lobby Page] Loaded room:", result);
+  // Verify room exists
+  const result = await getRoomState(code);
 
   if (result.error || !result.room) {
-    // Room not found, redirect to home
     redirect("/");
   }
 
-  return (
-    <WaitingLobby
-      roomCode={code}
-      isHost={isHost === "true"}
-      initialRoom={result.room}
-    />
-  );
+  return <WaitingLobby roomCode={code} />;
 }
