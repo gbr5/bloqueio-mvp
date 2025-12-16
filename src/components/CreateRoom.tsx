@@ -37,7 +37,10 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
       } else {
         setRoomCode(result.code);
         // Store player ID in sessionStorage
-        sessionStorage.setItem(`room_${result.code}_playerId`, String(result.playerId));
+        sessionStorage.setItem(
+          `room_${result.code}_playerId`,
+          String(result.playerId)
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create room");
