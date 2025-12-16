@@ -9,6 +9,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/lib/toast";
 import { getRoomState } from "@/lib/actions/room-actions";
 import { startGame } from "@/lib/actions/game-actions";
 import { POLLING_INTERVALS } from "@/config/polling";
@@ -66,7 +67,7 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
       const result = await startGame(roomCode);
 
       if ("error" in result) {
-        alert(result.error);
+        toast.error(result.error);
         setStarting(false);
         return;
       }
@@ -74,14 +75,14 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
       // Navigation will happen automatically via polling
     } catch (error) {
       console.error("Failed to start game:", error);
-      alert("Failed to start game");
+      toast.error("Failed to start game");
       setStarting(false);
     }
   };
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(roomCode);
-    // Could add a toast notification here
+    toast.success("Room code copied!");
   };
 
   const handleLeaveRoom = () => {

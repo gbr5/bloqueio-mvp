@@ -11,6 +11,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/lib/toast";
 import { getRoomState } from "@/lib/actions/room-actions";
 import { makeMove, placeBarrier } from "@/lib/actions/game-actions";
 import { getAdaptiveInterval } from "@/config/polling";
@@ -206,7 +207,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
       );
 
       if ("error" in result) {
-        alert(`Move rejected: ${result.error}`);
+        toast.error(`Move rejected: ${result.error}`);
         // Rollback: Refresh from server
         const refreshResult = await getRoomState(roomCode);
         if (!("error" in refreshResult)) {
@@ -255,7 +256,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
       );
 
       if ("error" in result) {
-        alert(`Barrier rejected: ${result.error}`);
+        toast.error(`Barrier rejected: ${result.error}`);
         // Rollback: Refresh from server
         const refreshResult = await getRoomState(roomCode);
         if (!("error" in refreshResult)) {
