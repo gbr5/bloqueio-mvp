@@ -488,7 +488,7 @@ export default function BloqueioPage({
     }
 
     if (currentPlayer.wallsLeft <= 0) {
-      if (!silent) toast.error("No barriers left!");
+      if (!silent) toast.error("Sem barreiras restantes!");
       return {
         ok: false,
         baseRow: 0,
@@ -592,7 +592,7 @@ export default function BloqueioPage({
     // 1) Cannot reuse blocked edges
     const anyAlreadyBlocked = edgesToAdd.some((e) => blockedEdges.has(e));
     if (anyAlreadyBlocked) {
-      if (!silent) toast.error("A barrier already exists in this space");
+      if (!silent) toast.error("Já existe uma barreira neste espaço");
       return {
         ok: false,
         baseRow,
@@ -608,7 +608,7 @@ export default function BloqueioPage({
         b.row === baseRow && b.col === baseCol && b.orientation !== orientation
     );
     if (crossesExisting) {
-      if (!silent) toast.error("Cannot cross barriers in X pattern");
+      if (!silent) toast.error("Não pode cruzar barreiras em X");
       return {
         ok: false,
         baseRow,
@@ -651,7 +651,7 @@ export default function BloqueioPage({
       );
       if (!silent)
         toast.error(
-          `This barrier would block ${blockedPlayers[0]?.name ?? "a player"} from their goal`
+          `Esta barreira bloquearia ${blockedPlayers[0]?.name ?? "um jogador"} de alcançar seu objetivo`
         );
       return {
         ok: false,
@@ -1046,22 +1046,33 @@ export default function BloqueioPage({
             gap: "0.5rem",
           }}
         >
-          <h1 style={{ fontSize: "1.6rem", fontWeight: 700 }}>
-            Bloqueio – 4 jogadores (9x9 interno + borda)
+          <h1
+            style={{
+              fontSize: "clamp(1.1rem, 4vw, 1.6rem)",
+              fontWeight: 700,
+              lineHeight: 1.2,
+            }}
+          >
+            Bloqueio
           </h1>
-          <p style={{ fontSize: "0.9rem", color: "#9ca3af" }}>
-            Objetivo: atravessar o tabuleiro interno e alcançar a borda oposta.
-            Cada jogador tem 6 barreiras (2 casas em linha reta). Os peões andam
-            1 casa ortogonal ou podem pular em linha reta por cima de outro
-            peão.
+          <p
+            style={{
+              fontSize: "clamp(0.75rem, 2.5vw, 0.9rem)",
+              color: "#9ca3af",
+              lineHeight: 1.4,
+            }}
+          >
+            Atravesse o tabuleiro e alcance a borda oposta. Cada jogador tem 6
+            barreiras. Os peões andam 1 casa ou pulam sobre outro peão.
           </p>
           <p
             style={{
-              fontSize: "0.95rem",
+              fontSize: "clamp(0.8rem, 3vw, 0.95rem)",
               padding: "0.3rem 0.8rem",
               borderRadius: 999,
               background: currentPlayer.color,
               border: "1px solid #1f2937",
+              textAlign: "center",
             }}
           >
             {statusText}

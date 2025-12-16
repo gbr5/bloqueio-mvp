@@ -239,7 +239,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
       );
 
       if ("error" in result) {
-        toast.error(`Move rejected: ${result.error}`);
+        toast.error(`Movimento rejeitado: ${result.error}`);
         // Rollback: Refresh from server
         const refreshResult = await getRoomState(roomCode);
         if (!("error" in refreshResult)) {
@@ -291,7 +291,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
       );
 
       if ("error" in result) {
-        toast.error(`Barrier rejected: ${result.error}`);
+        toast.error(`Barreira rejeitada: ${result.error}`);
         // Rollback: Refresh from server
         const refreshResult = await getRoomState(roomCode);
         if (!("error" in refreshResult)) {
@@ -321,7 +321,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
     if ("error" in result) {
       toast.error(result.error);
     } else {
-      toast.success("Action undone");
+      toast.success("Ação desfeita");
       // Refresh state from server
       const refreshResult = await getRoomState(roomCode);
       if (!("error" in refreshResult)) {
@@ -338,7 +338,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
       <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-slate-400">Loading game...</p>
+          <p className="text-slate-400">Carregando jogo...</p>
         </div>
       </div>
     );
@@ -346,33 +346,65 @@ export function GameBoard({ roomCode }: GameBoardProps) {
 
   const isMyTurn = myPlayerId === room.currentTurn;
 
+  // Get current player's name for display
+  const myPlayer = gameState.players.find((p) => p.id === myPlayerId);
+  const currentTurnPlayer = gameState.players.find(
+    (p) => p.id === gameState.currentPlayerId
+  );
+
   return (
     <div className="relative">
-      {/* Game Info Header */}
-      <div className="absolute top-4 left-4 z-10">
-        <div className="bg-slate-800/90 backdrop-blur border border-slate-700 rounded-lg p-4 shadow-lg space-y-2 text-sm">
-          <p className="font-semibold">Room: {roomCode}</p>
-          {myPlayerId !== null && (
-            <p className="text-slate-300">You are: Player {myPlayerId + 1}</p>
-          )}
-          <div className="border-t border-slate-600 pt-2">
-            <p className="text-slate-400 text-xs">
-              Current Turn: Player {gameState.currentPlayerId + 1}
-            </p>
+      {/* Game Info Header - responsive positioning */}
+      <div className="fixed sm:absolute bottom-4 left-4 right-4 sm:right-auto sm:bottom-auto sm:top-4 z-10">
+        <div className="bg-slate-800/95 backdrop-blur border border-slate-700 rounded-lg p-3 sm:p-4 shadow-lg text-sm">
+          <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-start sm:gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 text-xs">Sala:</span>
+              <span className="font-mono font-semibold text-white">
+                {roomCode}
+              </span>
+            </div>
+            {myPlayer && (
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full border border-white/50"
+                  style={{ backgroundColor: myPlayer.color }}
+                />
+                <span className="text-slate-300 text-xs sm:text-sm">
+                  {myPlayer.name}
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="border-t border-slate-600 mt-2 pt-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-400 text-xs">Turno:</span>
+              <div className="flex items-center gap-2">
+                {currentTurnPlayer && (
+                  <div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: currentTurnPlayer.color }}
+                  />
+                )}
+                <span className="text-white text-xs font-medium">
+                  {currentTurnPlayer?.name ?? `Jogador ${gameState.currentPlayerId + 1}`}
+                </span>
+              </div>
+            </div>
             {isMyTurn ? (
-              <p className="text-green-400 font-semibold text-xs mt-1">
-                ✓ Your turn!
+              <p className="text-green-400 font-semibold text-xs mt-1 text-center sm:text-left">
+                ✓ Sua vez!
               </p>
             ) : (
-              <p className="text-yellow-400 text-xs mt-1">
-                Waiting for opponent...
+              <p className="text-yellow-400 text-xs mt-1 text-center sm:text-left">
+                Aguardando oponente...
               </p>
             )}
           </div>
           {gameState.winner !== null && (
-            <div className="border-t border-slate-600 pt-2">
-              <p className="text-yellow-400 font-bold">
-                🏆 Player {gameState.winner + 1} wins!
+            <div className="border-t border-slate-600 pt-2 mt-2">
+              <p className="text-yellow-400 font-bold text-center">
+                🏆 {gameState.players.find((p) => p.id === gameState.winner)?.name ?? `Jogador ${gameState.winner + 1}`} venceu!
               </p>
             </div>
           )}
@@ -381,11 +413,11 @@ export function GameBoard({ roomCode }: GameBoardProps) {
 
       {/* Undo Button - shown when player can undo */}
       {canUndo && !isMyTurn && (
-        <div className="absolute top-4 right-4 z-10">
+        <div className="fixed sm:absolute bottom-20 sm:bottom-auto right-4 sm:top-4 z-10">
           <button
             onClick={handleUndo}
             disabled={isLoading}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-800 disabled:opacity-50 text-white font-medium rounded-lg transition-colors shadow-lg"
+            className="flex items-center gap-2 px-3 py-2 sm:px-4 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-800 disabled:opacity-50 text-white font-medium rounded-lg transition-colors shadow-lg text-sm"
           >
             {isLoading ? (
               <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
@@ -404,7 +436,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
                 />
               </svg>
             )}
-            Undo
+            Desfazer
           </button>
         </div>
       )}
@@ -414,7 +446,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
         <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-20 pointer-events-none">
           <div className="bg-slate-800/90 backdrop-blur border border-slate-700 rounded-lg px-6 py-3 flex items-center gap-3">
             <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent" />
-            <span className="text-white text-sm">Processing...</span>
+            <span className="text-white text-sm">Processando...</span>
           </div>
         </div>
       )}
@@ -430,24 +462,24 @@ export function GameBoard({ roomCode }: GameBoardProps) {
       {/* Game Over Modal */}
       {showGameOver && gameState.winner !== null && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-slate-800 border-2 border-slate-700 rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">
+          <div className="bg-slate-800 border-2 border-slate-700 rounded-xl p-6 sm:p-8 max-w-md w-full mx-4 shadow-2xl">
             <div className="text-center space-y-6">
               <div className="space-y-2">
-                <div className="text-6xl">🏆</div>
-                <h2 className="text-3xl font-bold text-yellow-400">
-                  Game Over!
+                <div className="text-5xl sm:text-6xl">🏆</div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-yellow-400">
+                  Fim de Jogo!
                 </h2>
-                <p className="text-2xl text-white">
+                <p className="text-xl sm:text-2xl text-white">
                   {myPlayerId === gameState.winner
-                    ? "You Win!"
-                    : `Player ${gameState.winner + 1} Wins!`}
+                    ? "Você Venceu!"
+                    : `${gameState.players.find((p) => p.id === gameState.winner)?.name ?? `Jogador ${gameState.winner + 1}`} Venceu!`}
                 </p>
               </div>
 
               {/* Player Stats */}
               <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
                 <h3 className="text-sm font-semibold text-slate-400 mb-2">
-                  Final Standings
+                  Resultado Final
                 </h3>
                 <div className="space-y-2">
                   {gameState.players.map((player) => (
@@ -480,7 +512,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
                   onClick={() => router.push("/")}
                   className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
                 >
-                  Return to Home
+                  Voltar ao Início
                 </button>
               </div>
             </div>
