@@ -11,6 +11,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getRoomState } from "@/lib/actions/room-actions";
 import { startGame } from "@/lib/actions/game-actions";
+import { POLLING_INTERVALS } from "@/config/polling";
 import type { Room, Player } from "@prisma/client";
 
 interface WaitingLobbyProps {
@@ -51,7 +52,7 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
     };
 
     loadRoom();
-    const interval = setInterval(loadRoom, 2000); // 2s polling for lobby
+    const interval = setInterval(loadRoom, POLLING_INTERVALS.LOBBY);
 
     return () => clearInterval(interval);
   }, [roomCode, router]);
@@ -165,7 +166,9 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
                 />
                 <div className="flex-1">
                   <p className="text-white font-semibold">{player.name}</p>
-                  <p className="text-sm text-slate-400">Player {player.playerId + 1}</p>
+                  <p className="text-sm text-slate-400">
+                    Player {player.playerId + 1}
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   {player.playerId === myPlayerId && (
