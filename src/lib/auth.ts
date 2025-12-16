@@ -7,6 +7,12 @@ export const auth = betterAuth({
     provider: "postgresql",
   }),
 
+  // Trust the host header from Vercel/proxy
+  trustedOrigins: [
+    "http://localhost:3000",
+    "https://bloqueio-mvp.vercel.app",
+  ],
+
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false, // Can enable later
