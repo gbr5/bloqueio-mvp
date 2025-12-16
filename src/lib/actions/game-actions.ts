@@ -162,13 +162,22 @@ export async function placeBarrier(
     // For an 11x11 grid (0-10):
     // - Horizontal barrier at (row, col) blocks edges between (row,col)↔(row+1,col) and (row,col+1)↔(row+1,col+1)
     // - Vertical barrier at (row, col) blocks edges between (row,col)↔(row,col+1) and (row+1,col)↔(row+1,col+1)
-    // Valid range for both row and col: 1 to 8 (needs row+1 and col+1 to be valid internal cells)
+    //
+    // Valid ranges depend on orientation:
+    // - HORIZONTAL: row 0-9 (needs row+1 ≤ 10), col 0-8 (needs col+1 ≤ 9 for two columns)
+    // - VERTICAL: col 0-9 (needs col+1 ≤ 10), row 0-8 (needs row+1 ≤ 9 for two rows)
     const GRID_SIZE = 11;
-    const MIN_POS = 1;
-    const MAX_POS = GRID_SIZE - 3; // 8 for 11x11 grid
 
-    if (row < MIN_POS || row > MAX_POS || col < MIN_POS || col > MAX_POS) {
-      return { error: "Cannot place barriers at this position" };
+    if (orientation === "HORIZONTAL") {
+      // Horizontal barriers: row can go up to 9, col up to 8
+      if (row < 0 || row > GRID_SIZE - 2 || col < 0 || col > GRID_SIZE - 3) {
+        return { error: "Posição inválida para barreira horizontal" };
+      }
+    } else {
+      // Vertical barriers: col can go up to 9, row up to 8
+      if (row < 0 || row > GRID_SIZE - 3 || col < 0 || col > GRID_SIZE - 2) {
+        return { error: "Posição inválida para barreira vertical" };
+      }
     }
 
     // 2. Check if EXACT same barrier already exists (same position + orientation)

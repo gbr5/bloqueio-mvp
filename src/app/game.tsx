@@ -521,41 +521,34 @@ export default function BloqueioPage({
     // Horizontal barrier at baseRow blocks edges between rows baseRow and baseRow+1
     // Vertical barrier at baseCol blocks edges between cols baseCol and baseCol+1
     //
-    // To allow blocking ALL border edges (top, left, bottom, right):
-    // - Clicking row 1 with H barrier → baseRow=0 (blocks row 0↔1, top border)
-    // - Clicking row 9 with H barrier → baseRow=9 (blocks row 9↔10, bottom border)
-    // - Same logic for columns with V barriers
+    // Valid ranges depend on orientation:
+    // - HORIZONTAL: baseRow 0-9 (needs row+1 ≤ 10), baseCol 0-8 (needs col+1 for 2 columns)
+    // - VERTICAL: baseCol 0-9 (needs col+1 ≤ 10), baseRow 0-8 (needs row+1 for 2 rows)
     //
-    // Strategy: Use clickRow-1 as base, but when clicking on the last internal row/col,
-    // use clickRow directly to allow placing barrier at the far edge.
-    //
-    // For HORIZONTAL barriers spanning 2 columns:
-    //   - baseRow range: 0 to SIZE-2 (=9) to cover all horizontal edges
-    //   - baseCol range: 0 to SIZE-3 (=8) since barrier needs baseCol and baseCol+1
-    // For VERTICAL barriers spanning 2 rows:
-    //   - baseCol range: 0 to SIZE-2 (=9) to cover all vertical edges
-    //   - baseRow range: 0 to SIZE-3 (=8) since barrier needs baseRow and baseRow+1
+    // Strategy: Use click position - 1 as base, clamped to valid range
     let baseRow: number;
     let baseCol: number;
 
     if (wallOrientation === "H") {
-      // For horizontal barriers: allow baseRow up to SIZE-2 to block bottom border
-      // Clicking last internal row (INNER_SIZE = 9) should give baseRow = 9
+      // Horizontal barriers: baseRow can be 0-9, baseCol can be 0-8
+      // Clicking row 1 → baseRow 0 (top border), clicking row 9 → baseRow 9 (bottom border)
       if (clickRow === INNER_SIZE) {
-        baseRow = clickRow; // Place at bottom edge
+        baseRow = INNER_SIZE; // Clicking row 9 → place at row 9 (blocks 9↔10)
       } else {
         baseRow = Math.max(0, clickRow - 1);
       }
-      baseCol = Math.max(0, Math.min(clickCol - 1, SIZE - 3));
+      // baseCol: clicking col 1 → baseCol 0, clicking col 9 → baseCol 8 (max)
+      baseCol = Math.max(0, Math.min(clickCol - 1, SIZE - 3)); // 0 to 8
     } else {
-      // For vertical barriers: allow baseCol up to SIZE-2 to block right border
-      // Clicking last internal col (INNER_SIZE = 9) should give baseCol = 9
+      // Vertical barriers: baseCol can be 0-9, baseRow can be 0-8
+      // Clicking col 9 → baseCol 9 (right border), clicking col 1 → baseCol 0 (left border)
       if (clickCol === INNER_SIZE) {
-        baseCol = clickCol; // Place at right edge
+        baseCol = INNER_SIZE; // Clicking col 9 → place at col 9 (blocks 9↔10)
       } else {
         baseCol = Math.max(0, clickCol - 1);
       }
-      baseRow = Math.max(0, Math.min(clickRow - 1, SIZE - 3));
+      // baseRow: clicking row 1 → baseRow 0, clicking row 9 → baseRow 8 (max)
+      baseRow = Math.max(0, Math.min(clickRow - 1, SIZE - 3)); // 0 to 8
     }
 
     const edgesToAdd: string[] = [];
