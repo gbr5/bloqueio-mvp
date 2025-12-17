@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import type { GoalSide } from "@prisma/client";
 import { getGameModeConfig, type GameMode } from "@/types/game";
+import crypto from "crypto";
 
 /**
  * Generate a random 6-character room code (uppercase letters and numbers)
@@ -96,7 +97,10 @@ export async function createRoom(
       data: {
         code,
         gameMode, // Set game mode
-        hostId: sessionId,
+        hostSessionId: sessionId, // Renamed from hostId
+        botSeed: crypto.randomUUID(), // Deterministic RNG seed for bot reproducibility
+        turnNumber: 0, // Initialize concurrency control
+        allowBots: false, // Can be enabled later for bot games
         players: {
           create: {
             playerId: 0,

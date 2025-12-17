@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getOrCreateSessionId } from "@/lib/session";
 import type { GoalSide, Prisma } from "@prisma/client";
 import { getGameModeConfig, type GameMode } from "@/types/game";
+import { afterMoveCommit, onGameStart } from "@/lib/bot/scheduler";
 
 /**
  * Get next player ID - works for both 2P and 4P modes
@@ -105,6 +106,7 @@ export async function makeMove(
             : getNextPlayerId(room.currentTurn, room.players),
           winner: isWin ? player.playerId : room.winner,
           status: isWin ? "FINISHED" : room.status,
+          turnNumber: { increment: 1 }, // Bot system: concurrency control
         },
       }),
     ];
@@ -132,6 +134,12 @@ export async function makeMove(
 
     // Execute transaction
     await db.$transaction(transactionOps);
+
+    // Bot system: Schedule bot move if next player is bot
+    // This must happen AFTER transaction commit (turnNumber already incremented)
+    if (!isWin) {
+      await afterMoveCommit(code);
+    }
 
     return { success: true };
   } catch (error) {
@@ -368,9 +376,13 @@ export async function placeBarrier(
         where: { id: room.id },
         data: {
           currentTurn: getNextPlayerId(room.currentTurn, room.players),
+          turnNumber: { increment: 1 }, // Bot system: concurrency control
         },
       }),
     ]);
+
+    // Bot system: Schedule bot move if next player is bot
+    await afterMoveCommit(code);
 
     return { success: true };
   } catch (error) {
@@ -544,6 +556,9 @@ export async function startGame(
       where: { id: room.id },
       data: { status: "PLAYING" },
     });
+
+    // Schedule bot move if first player is a bot
+    await onGameStart(code);
 
     return { success: true };
   } catch (error) {
