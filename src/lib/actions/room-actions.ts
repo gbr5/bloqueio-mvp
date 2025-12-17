@@ -4,9 +4,16 @@ import { db } from "@/lib/db";
 import { getOrCreateSessionId, getGuestName } from "@/lib/session";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import type { GoalSide } from "@prisma/client";
+import type { GoalSide, PlayerType } from "@prisma/client";
 import { getGameModeConfig, type GameMode } from "@/types/game";
 import crypto from "crypto";
+
+type PlayerSlotConfig =
+  | "EMPTY"
+  | "HUMAN"
+  | "BOT_EASY"
+  | "BOT_MEDIUM"
+  | "BOT_HARD";
 
 /**
  * Generate a random 6-character room code (uppercase letters and numbers)
@@ -57,9 +64,13 @@ const PLAYER_CONFIGS = [
 /**
  * Create a new game room
  * Returns room code and player ID (host is always player 0)
+ *
+ * @param gameMode - TWO_PLAYER or FOUR_PLAYER
+ * @param playerSlots - Optional array defining which slots are bots/humans (host is always HUMAN at index 0)
  */
 export async function createRoom(
-  gameMode: GameMode = "FOUR_PLAYER"
+  gameMode: GameMode = "FOUR_PLAYER",
+  playerSlots?: PlayerSlotConfig[]
 ): Promise<{ code: string; playerId: number } | { error: string }> {
   try {
     // Validate gameMode
@@ -92,27 +103,80 @@ export async function createRoom(
     // Determine player name: auth user name > guest name > default
     const playerName = session?.user?.name || guestName || config.name;
 
-    // Create room + host player in transaction
+    const modeConfig = getGameModeConfig(gameMode);
+    const hasBots =
+      playerSlots &&
+      playerSlots.some(
+        (slot) =>
+          slot === "BOT_EASY" || slot === "BOT_MEDIUM" || slot === "BOT_HARD"
+      );
+
+    // Build initial players array
+    const playersToCreate = [];
+
+    // Always create host as player 0
+    playersToCreate.push({
+      playerId: 0,
+      sessionId,
+      userId: session?.user?.id || null,
+      name: playerName,
+      color: config.color,
+      row: config.row,
+      col: config.col,
+      goalSide: config.goalSide,
+      wallsLeft: modeConfig.wallsPerPlayer,
+      playerType: "HUMAN" as PlayerType,
+    });
+
+    // Create bot players if specified
+    if (playerSlots && hasBots) {
+      for (
+        let i = 1;
+        i < playerSlots.length && i < modeConfig.maxPlayers;
+        i++
+      ) {
+        const slotType = playerSlots[i];
+
+        // Skip empty slots
+        if (slotType === "EMPTY") continue;
+
+        // Skip HUMAN slots (they'll join later)
+        if (slotType === "HUMAN") continue;
+
+        // Create bot player
+        if (
+          slotType === "BOT_EASY" ||
+          slotType === "BOT_MEDIUM" ||
+          slotType === "BOT_HARD"
+        ) {
+          const botConfig = PLAYER_CONFIGS[i];
+          playersToCreate.push({
+            playerId: i,
+            sessionId: null, // Bots don't have sessions
+            userId: null,
+            name: `Bot ${i + 1}`,
+            color: botConfig.color,
+            row: botConfig.row,
+            col: botConfig.col,
+            goalSide: botConfig.goalSide,
+            wallsLeft: modeConfig.wallsPerPlayer,
+            playerType: slotType as PlayerType, // BOT_EASY, BOT_MEDIUM, or BOT_HARD
+          });
+        }
+      }
+    }
+
+    // Create room + initial players in transaction
     const room = await db.room.create({
       data: {
         code,
-        gameMode, // Set game mode
-        hostSessionId: sessionId, // Renamed from hostId
+        gameMode,
+        hostSessionId: sessionId,
         botSeed: crypto.randomUUID(), // Deterministic RNG seed for bot reproducibility
         turnNumber: 0, // Initialize concurrency control
-        allowBots: false, // Can be enabled later for bot games
+        allowBots: hasBots, // Enable bots if any are configured
         players: {
-          create: {
-            playerId: 0,
-            sessionId,
-            userId: session?.user?.id || null,
-            name: playerName,
-            color: config.color,
-            row: config.row,
-            col: config.col,
-            goalSide: config.goalSide,
-            wallsLeft: getGameModeConfig(gameMode).wallsPerPlayer, // Dynamic based on mode
-          },
+          create: playersToCreate,
         },
       },
     });

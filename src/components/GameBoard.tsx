@@ -196,6 +196,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
           color: p.color,
           label: `P${p.playerId + 1}`,
           name: p.name,
+          playerType: p.playerType, // Pass bot type info to game UI
         })),
         barriers: room.barriers.map((b) => ({
           id: b.id,

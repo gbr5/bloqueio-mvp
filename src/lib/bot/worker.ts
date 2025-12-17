@@ -12,7 +12,10 @@ import { BotEngine } from "./engine";
  * Call this on an interval (1-2s) or via cron job
  * Safe to call multiple times concurrently (DB constraints prevent duplicates)
  */
-export async function processPendingBotJobs(): Promise<{ processed: number; failed: number }> {
+export async function processPendingBotJobs(): Promise<{
+  processed: number;
+  failed: number;
+}> {
   const pendingJobs = await db.botMoveJob.findMany({
     where: { status: "PENDING" },
     orderBy: { createdAt: "asc" },
@@ -159,7 +162,9 @@ async function processSingleBotJob(jobId: string): Promise<void> {
  * 2. Scheduled job (e.g., via Vercel Cron)
  * 3. Separate worker process
  */
-export async function startWorkerLoop(intervalMs: number = 1000): Promise<() => void> {
+export async function startWorkerLoop(
+  intervalMs: number = 1000
+): Promise<() => void> {
   console.log(`🤖 Bot worker loop started (polling every ${intervalMs}ms)`);
 
   const intervalId = setInterval(async () => {

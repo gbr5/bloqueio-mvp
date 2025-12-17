@@ -10,7 +10,11 @@ const BOARD_SIZE = 11; // 0-10
 /**
  * Check if a cell is a goal cell for given side
  */
-export function isGoalCell(row: number, col: number, goalSide: GoalSide): boolean {
+export function isGoalCell(
+  row: number,
+  col: number,
+  goalSide: GoalSide
+): boolean {
   switch (goalSide) {
     case "TOP":
       return row === 0;
@@ -100,7 +104,12 @@ function getValidNeighbors(
     const newCol = col + dc;
 
     // Check bounds
-    if (newRow < 0 || newRow > BOARD_SIZE - 1 || newCol < 0 || newCol > BOARD_SIZE - 1) {
+    if (
+      newRow < 0 ||
+      newRow > BOARD_SIZE - 1 ||
+      newCol < 0 ||
+      newCol > BOARD_SIZE - 1
+    ) {
       continue;
     }
 
@@ -120,7 +129,12 @@ function getValidNeighbors(
  * Normalize edge key for consistent lookup
  * Both (r1,c1)→(r2,c2) and (r2,c2)→(r1,c1) map to same key
  */
-function normalizeEdgeKey(r1: number, c1: number, r2: number, c2: number): string {
+function normalizeEdgeKey(
+  r1: number,
+  c1: number,
+  r2: number,
+  c2: number
+): string {
   if (r1 > r2 || (r1 === r2 && c1 > c2)) {
     return `${r2},${c2}:${r1},${c1}`;
   }

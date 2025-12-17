@@ -3,12 +3,14 @@
 ## ✅ Phase 0: Complete (Dec 2024)
 
 **Foundation built** - All core modules implemented and tested:
+
 - Database schema with bot tables (BotMoveJob, BotDecisionLog)
 - 7 core modules: types, RNG, pathfinding, scheduler, worker, engine, easy strategy
 - Migration applied successfully
 - 727 lines of production code
 
-**Commits**: 
+**Commits**:
+
 1. Initial analysis and implementation plan
 2. Phase 0 implementation
 3. Phase 0 completion report
@@ -16,6 +18,7 @@
 ## ✅ Phase 1: Complete (Just Now!)
 
 **Integration complete** - Bot system integrated with game flow:
+
 - Room creation generates `botSeed` and `turnNumber`
 - `makeMove()` and `placeBarrier()` trigger bot scheduling via `afterMoveCommit()`
 - `startGame()` schedules first bot if applicable
@@ -24,6 +27,7 @@
 - Worker deployed via Vercel Cron (runs every 60 seconds)
 
 **Files Modified**:
+
 - `src/lib/actions/game-actions.ts` - Added hooks and turnNumber
 - `src/lib/actions/room-actions.ts` - Added botSeed generation
 - `src/lib/bot/engine.ts` - Complete rewrite with move application
@@ -31,6 +35,7 @@
 - `vercel.json` - NEW cron configuration
 
 **Commits**:
+
 1. Phase 1 integration (game actions + worker)
 2. Phase 1 documentation (testing guide + completion report)
 
@@ -50,6 +55,7 @@ Before building UI, we need to validate the integration works:
 ### Manual Testing via Prisma Studio
 
 **Test 1: Bot vs Bot Game** (Simplest validation)
+
 ```bash
 1. Open Prisma Studio: pnpm prisma studio
 2. Create a Room with gameMode: TWO_PLAYER
@@ -60,6 +66,7 @@ Before building UI, we need to validate the integration works:
 ```
 
 **Test 2: Human vs Bot Game**
+
 ```bash
 1. Create room via UI
 2. Join as human
@@ -93,6 +100,7 @@ Before building UI, we need to validate the integration works:
 Once Phase 1 testing validates everything works:
 
 ### CreateRoom Component Updates (2-3 hours)
+
 ```typescript
 // Add bot selection UI:
 - Toggle: "Allow Bots" (updates Room.allowBots)
@@ -101,6 +109,7 @@ Once Phase 1 testing validates everything works:
 ```
 
 ### GameBoard Component Updates (1-2 hours)
+
 ```typescript
 // Add bot indicators:
 - 🤖 icon for bot players
@@ -109,6 +118,7 @@ Once Phase 1 testing validates everything works:
 ```
 
 ### WaitingLobby Component Updates (2-3 hours)
+
 ```typescript
 // Add mid-game replacement:
 - "Replace with Bot" button for disconnected players
@@ -120,13 +130,13 @@ Once Phase 1 testing validates everything works:
 
 ## 📊 Overall Progress
 
-| Phase | Status | Time Spent | Remaining |
-|-------|--------|-----------|-----------|
-| Phase 0: Foundation | ✅ Complete | ~6 hours | - |
-| Phase 1: Integration | ✅ Complete | ~4 hours | - |
-| Phase 1.5: Testing | 🔄 In Progress | 0 hours | 4-8 hours |
-| Phase 2: UI | ⏳ Pending | 0 hours | 5-8 hours |
-| Phase 3: Optimization | ⏳ Future | - | TBD |
+| Phase                 | Status         | Time Spent | Remaining |
+| --------------------- | -------------- | ---------- | --------- |
+| Phase 0: Foundation   | ✅ Complete    | ~6 hours   | -         |
+| Phase 1: Integration  | ✅ Complete    | ~4 hours   | -         |
+| Phase 1.5: Testing    | 🔄 In Progress | 0 hours    | 4-8 hours |
+| Phase 2: UI           | ⏳ Pending     | 0 hours    | 5-8 hours |
+| Phase 3: Optimization | ⏳ Future      | -          | TBD       |
 
 **Total Time**: ~10 hours invested, ~15-20 hours to fully functional MVP
 
@@ -134,22 +144,24 @@ Once Phase 1 testing validates everything works:
 
 ### Current Implementation Status
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| **Pre-game bot selection** | 🔄 Backend done, UI pending | Can add bots via DB |
-| **Mid-game replacement** | 🔄 Backend done, UI pending | Can replace via DB |
-| **Easy difficulty** | ✅ Complete | Random valid moves |
-| **Medium difficulty** | ⏳ Not started | Needs strategy implementation |
-| **Hard difficulty** | ⏳ Not started | Needs lookahead + evaluation |
+| Feature                    | Status                      | Notes                         |
+| -------------------------- | --------------------------- | ----------------------------- |
+| **Pre-game bot selection** | 🔄 Backend done, UI pending | Can add bots via DB           |
+| **Mid-game replacement**   | 🔄 Backend done, UI pending | Can replace via DB            |
+| **Easy difficulty**        | ✅ Complete                 | Random valid moves            |
+| **Medium difficulty**      | ⏳ Not started              | Needs strategy implementation |
+| **Hard difficulty**        | ⏳ Not started              | Needs lookahead + evaluation  |
 
 ### Difficulty Implementation (Phase 2.5)
 
 **Medium Bot Strategy** (3-4 hours)
+
 - Weighted move selection (prefer forward moves)
 - Basic barrier placement (block opponent paths)
 - Path length optimization
 
 **Hard Bot Strategy** (5-6 hours)
+
 - 2-3 move lookahead
 - Minimax evaluation
 - Optimal barrier placement
@@ -160,6 +172,7 @@ Once Phase 1 testing validates everything works:
 ## 🚀 Deployment Strategy
 
 ### Local Testing (Now)
+
 ```bash
 # 1. Start local dev server
 pnpm dev
@@ -172,6 +185,7 @@ curl http://localhost:3000/api/cron/process-bot-jobs
 ```
 
 ### Vercel Deployment (After Testing)
+
 ```bash
 # 1. Push to GitHub
 git push origin feature/ai-bot-system
@@ -184,6 +198,7 @@ vercel logs --follow
 ```
 
 ### Production Checklist
+
 - [ ] All Phase 1 tests passing
 - [ ] No console errors in worker
 - [ ] Database migrations applied
@@ -193,13 +208,13 @@ vercel logs --follow
 
 ## 📝 Documentation Status
 
-| Document | Status | Location |
-|----------|--------|----------|
-| Analysis | ✅ Complete | `docs/features/AI_BOT_ANALYSIS.md` |
+| Document            | Status      | Location                                      |
+| ------------------- | ----------- | --------------------------------------------- |
+| Analysis            | ✅ Complete | `docs/features/AI_BOT_ANALYSIS.md`            |
 | Implementation Plan | ✅ Complete | `docs/features/AI_BOT_IMPLEMENTATION_PLAN.md` |
-| Phase 0 Complete | ✅ Complete | `docs/progress/PHASE0_BOT_COMPLETE.md` |
-| Phase 1 Complete | ✅ Complete | `docs/progress/PHASE1_COMPLETE.md` |
-| Testing Guide | ✅ Complete | `docs/progress/PHASE1_TESTING_GUIDE.md` |
+| Phase 0 Complete    | ✅ Complete | `docs/progress/PHASE0_BOT_COMPLETE.md`        |
+| Phase 1 Complete    | ✅ Complete | `docs/progress/PHASE1_COMPLETE.md`            |
+| Testing Guide       | ✅ Complete | `docs/progress/PHASE1_TESTING_GUIDE.md`       |
 
 ## 🎓 What We Learned
 

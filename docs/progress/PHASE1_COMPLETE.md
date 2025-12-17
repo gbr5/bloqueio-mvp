@@ -14,16 +14,19 @@ Phase 1 successfully integrates the bot system with existing game actions. Bots 
 ### ✅ Primary Goals
 
 1. **Integrate bot scheduling with game actions**
+
    - `makeMove()` and `placeBarrier()` call `afterMoveCommit()`
    - `startGame()` calls `onGameStart()`
    - Every game action increments `turnNumber` for idempotency
 
 2. **Generate bot infrastructure on room creation**
+
    - `botSeed` generated as `crypto.randomUUID()`
    - `turnNumber` initialized to 0
    - `hostSessionId` stored for bot management
 
 3. **Implement real move application in BotEngine**
+
    - `applyBotMove()` - Direct DB transaction for pawn movement
    - `applyBotWall()` - Direct DB transaction for barrier placement
    - `checkWin()` - Goal detection and game completion
@@ -39,6 +42,7 @@ Phase 1 successfully integrates the bot system with existing game actions. Bots 
 ### Game Actions Integration
 
 **src/lib/actions/game-actions.ts** (3 changes)
+
 ```typescript
 // 1. Import scheduler hooks
 import { afterMoveCommit, onGameStart } from "@/lib/bot/scheduler";
@@ -46,10 +50,10 @@ import { afterMoveCommit, onGameStart } from "@/lib/bot/scheduler";
 // 2. Add to makeMove() and placeBarrier()
 await db.room.update({
   where: { id: room.id },
-  data: { 
+  data: {
     currentPlayerId: nextPlayerId,
-    turnNumber: { increment: 1 } // NEW
-  }
+    turnNumber: { increment: 1 }, // NEW
+  },
 });
 await afterMoveCommit(code); // NEW
 
@@ -58,6 +62,7 @@ await onGameStart(code); // NEW - schedules bot if first player is bot
 ```
 
 **src/lib/actions/room-actions.ts** (4 changes)
+
 ```typescript
 import crypto from "crypto"; // NEW
 
@@ -69,7 +74,7 @@ await db.room.create({
     hostSessionId: sessionId, // RENAMED from hostId
     allowBots: false, // NEW
     // ... rest
-  }
+  },
 });
 ```
 
@@ -78,23 +83,28 @@ await db.room.create({
 **src/lib/bot/engine.ts** (complete rewrite - 318 lines)
 
 **Key Methods Added:**
+
 1. `applyBotMove(roomId, playerId, toRow, toCol)` - 35 lines
+
    - Direct Prisma transaction
    - Updates Player position
    - Increments Room.turnNumber
    - Bypasses session validation
 
 2. `applyBotWall(roomId, playerId, row, col, orientation)` - 28 lines
+
    - Direct Prisma transaction
    - Creates Barrier
    - Decrements Player.wallsLeft
    - Increments Room.turnNumber
 
 3. `checkWin(room, players, playerId)` - 15 lines
+
    - Detects if player reached goalSide border
    - Returns boolean
 
 4. `getNextPlayerId(room, currentId)` - 12 lines
+
    - Cycles through turn order
    - Handles both 2P and 4P modes
 
@@ -104,10 +114,11 @@ await db.room.create({
    - Normalizes edge keys
 
 **Bot Chaining:**
+
 ```typescript
 async executeBotMove(roomCode: string, playerId: number): Promise<void> {
   // ... get strategy, make decision, apply move ...
-  
+
   // Enable bot chains (bot → bot → bot → human)
   await afterMoveCommit(roomCode);
 }
@@ -116,6 +127,7 @@ async executeBotMove(roomCode: string, playerId: number): Promise<void> {
 ### Worker Deployment
 
 **src/app/api/cron/process-bot-jobs/route.ts** (new file - 52 lines)
+
 ```typescript
 export async function GET(request: Request) {
   const result = await processPendingBotJobs();
@@ -128,6 +140,7 @@ export async function GET(request: Request) {
 ```
 
 **vercel.json** (new file)
+
 ```json
 {
   "crons": [
@@ -146,26 +159,28 @@ export async function GET(request: Request) {
 **Decision**: Bots bypass game actions and write directly to database
 
 **Rationale**:
+
 - Game actions have session validation (`getOrCreateSessionId()`)
 - Bots don't have sessions (`sessionId: null`)
 - Reusing actions would require complex mocking or refactoring
 - Direct transactions are simpler and more reliable
 
 **Implementation**:
+
 ```typescript
 // Bot move transaction (simplified)
 await db.$transaction([
   db.player.update({
     where: { id: botPlayer.id },
-    data: { row: toRow, col: toCol }
+    data: { row: toRow, col: toCol },
   }),
   db.room.update({
     where: { id: room.id },
-    data: { 
+    data: {
       currentPlayerId: nextPlayerId,
-      turnNumber: { increment: 1 }
-    }
-  })
+      turnNumber: { increment: 1 },
+    },
+  }),
 ]);
 ```
 
@@ -174,12 +189,14 @@ await db.$transaction([
 **Decision**: Use `crypto.randomUUID()` for botSeed
 
 **Rationale**:
+
 - UUIDs are globally unique (no collisions)
 - crypto module is standard Node.js (no dependencies)
 - More random than timestamps (harder to predict)
 - Same length regardless of room creation time
 
 **Alternative Considered**:
+
 - Timestamp: `Date.now()` - rejected (predictable, not unique enough)
 - Random string: `Math.random().toString(36)` - rejected (not cryptographically secure)
 
@@ -188,6 +205,7 @@ await db.$transaction([
 **Decision**: Use Vercel's built-in cron jobs
 
 **Rationale**:
+
 - Zero configuration (just add vercel.json)
 - Automatic deployment with main app
 - No separate process to manage
@@ -195,6 +213,7 @@ await db.$transaction([
 - Good enough for MVP (60s interval acceptable)
 
 **Alternative Considered**:
+
 - Custom worker process - rejected (over-engineering for MVP)
 - Next.js middleware loop - rejected (not designed for long-running tasks)
 
@@ -203,12 +222,14 @@ await db.$transaction([
 **Decision**: Use LCG algorithm with `${botSeed}:${turnNumber}:${playerId}` seed
 
 **Rationale**:
+
 - Makes bot moves reproducible (debugging)
 - Same seed = same move sequence
 - Helps with testing and validation
 - No dependence on Math.random() (non-deterministic)
 
 **Implementation**:
+
 ```typescript
 const seed = `${room.botSeed}:${room.turnNumber}:${playerId}`;
 const rng = new SeededRNG(seed);
@@ -265,11 +286,12 @@ const strategy = this.getBotStrategy(playerType, rng);
    → Bot 1 moves
    → afterMoveCommit() sees Player 2 is Human
    → No job scheduled
-   
+
 5. Turn returns to Human
 ```
 
 **Timing**:
+
 - Each bot move: ~60 seconds (cron interval)
 - 2 bots in sequence: ~120 seconds
 - Acceptable for MVP
@@ -279,6 +301,7 @@ const strategy = this.getBotStrategy(playerType, rng);
 See [PHASE1_TESTING_GUIDE.md](./PHASE1_TESTING_GUIDE.md) for comprehensive testing procedures.
 
 **Quick Test**:
+
 ```bash
 # 1. Create room with 2 bots via Prisma Studio
 # 2. Start game manually or via API
@@ -290,21 +313,25 @@ See [PHASE1_TESTING_GUIDE.md](./PHASE1_TESTING_GUIDE.md) for comprehensive testi
 ## Known Limitations
 
 ### 1. No UI for Bot Selection (Phase 2)
+
 - **Current**: Manual DB manipulation via Prisma Studio
 - **Impact**: Can't test via production UI
 - **Fix**: Build CreateRoom UI with bot toggles
 
 ### 2. 60-Second Bot Response Time (Vercel Cron)
+
 - **Current**: Bot moves take up to 60 seconds
 - **Impact**: Slow for user experience
 - **Fix**: Move to WebSocket in Phase 3 (if needed)
 
 ### 3. No Reconnection for Bots
+
 - **Current**: If worker fails, job stays PENDING
 - **Impact**: Rare edge case (worker very reliable)
 - **Fix**: Add retry logic or manual job reset
 
 ### 4. No Move Animations for Bots
+
 - **Current**: Bot moves appear instantly on next poll
 - **Impact**: UX feels abrupt
 - **Fix**: Add transition animations in Phase 2
@@ -313,13 +340,13 @@ See [PHASE1_TESTING_GUIDE.md](./PHASE1_TESTING_GUIDE.md) for comprehensive testi
 
 ### Database Impact
 
-| Table | New Columns | New Rows per Game |
-|-------|------------|------------------|
-| Room | `botSeed`, `turnNumber` | 0 (just updates) |
-| BotMoveJob | - | ~20-40 (1 per bot turn) |
-| BotDecisionLog | - | ~20-40 (1 per bot turn) |
-| Barrier | - | ~0-12 (if bots place barriers) |
-| Player | - | 0 (just position updates) |
+| Table          | New Columns             | New Rows per Game              |
+| -------------- | ----------------------- | ------------------------------ |
+| Room           | `botSeed`, `turnNumber` | 0 (just updates)               |
+| BotMoveJob     | -                       | ~20-40 (1 per bot turn)        |
+| BotDecisionLog | -                       | ~20-40 (1 per bot turn)        |
+| Barrier        | -                       | ~0-12 (if bots place barriers) |
+| Player         | -                       | 0 (just position updates)      |
 
 **Total Overhead**: ~40-80 rows per bot game (minimal)
 
@@ -358,11 +385,13 @@ See [PHASE1_TESTING_GUIDE.md](./PHASE1_TESTING_GUIDE.md) for comprehensive testi
 ### High Priority
 
 1. **Bot Selection in CreateRoom** (2-3 hours)
+
    - Add "Allow Bots" toggle
    - Add bot difficulty selector per player slot
    - Pre-fill bot players before game starts
 
 2. **Bot Indicators in GameBoard** (1-2 hours)
+
    - Show 🤖 icon for bot players
    - Display "Bot is thinking..." during bot turns
    - Show countdown to next cron tick
@@ -375,6 +404,7 @@ See [PHASE1_TESTING_GUIDE.md](./PHASE1_TESTING_GUIDE.md) for comprehensive testi
 ### Medium Priority
 
 4. **Bot Move Animations** (3-4 hours)
+
    - Detect bot moves via polling
    - Animate pawn movement
    - Animate barrier placement
@@ -388,6 +418,7 @@ See [PHASE1_TESTING_GUIDE.md](./PHASE1_TESTING_GUIDE.md) for comprehensive testi
 ### Low Priority (Phase 3)
 
 6. **Bot Difficulty Balancing** (4-6 hours)
+
    - Implement Medium and Hard strategies
    - Tune aggression parameters
    - Add lookahead depth for Hard bots

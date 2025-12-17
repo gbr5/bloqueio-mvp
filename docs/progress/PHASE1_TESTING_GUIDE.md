@@ -9,16 +9,19 @@ Phase 1 integration is complete. The bot system is now fully integrated with the
 ### ✅ Core Integration Points
 
 1. **Room Creation** (`room-actions.ts`)
+
    - Generates `botSeed: crypto.randomUUID()` on every room
    - Initializes `turnNumber: 0`
    - Adds `hostSessionId` for bot management
 
 2. **Game Actions** (`game-actions.ts`)
+
    - `makeMove()`: Increments `turnNumber`, calls `afterMoveCommit()`
    - `placeBarrier()`: Increments `turnNumber`, calls `afterMoveCommit()`
    - `startGame()`: Calls `onGameStart()` to schedule first bot move
 
 3. **Bot Engine** (`engine.ts`)
+
    - `applyBotMove()`: Direct DB transaction for pawn movement
    - `applyBotWall()`: Direct DB transaction for barrier placement
    - `checkWin()`: Detects goal achievement
@@ -78,6 +81,7 @@ curl -X POST http://localhost:3000/room/TEST01/start \
 ```
 
 **Expected Behavior:**
+
 - Worker picks up first job (bot 0)
 - Bot 0 makes a move toward BOTTOM
 - Worker picks up next job (bot 1)
@@ -106,6 +110,7 @@ curl -X POST http://localhost:3000/room/TEST01/start \
 ```
 
 **Expected Behavior:**
+
 - Human moves → turnNumber increments → afterMoveCommit schedules bot
 - Bot job created with status: PENDING
 - Worker picks up job on next cron tick (max 60 seconds)
@@ -126,6 +131,7 @@ curl -X POST http://localhost:3000/room/TEST01/start \
 ```
 
 **Expected Behavior:**
+
 - Bot seamlessly replaces disconnected player
 - Game continues without interruption
 - Bot plays from abandoned player's position
@@ -144,6 +150,7 @@ VALUES ('TEST01', 0, 5, 'PENDING');
 ```
 
 **Expected Behavior:**
+
 - Second INSERT fails due to unique constraint `(code, playerId, expectedTurn)`
 - Only one job processed
 
@@ -158,6 +165,7 @@ VALUES ('TEST01', 0, 3, 'PENDING');
 ```
 
 **Expected Behavior:**
+
 - Worker marks job as STALE
 - No move applied
 - Error: "Job stale: expected turn 3, room at turn 10"
@@ -168,13 +176,14 @@ VALUES ('TEST01', 0, 3, 'PENDING');
 // Modify easy.ts to add artificial delay:
 export class EasyBotStrategy implements BotStrategy {
   async decide(snapshot: GameSnapshot, rng: SeededRNG): Promise<BotDecision> {
-    await new Promise(resolve => setTimeout(resolve, 6000)); // 6 seconds
+    await new Promise((resolve) => setTimeout(resolve, 6000)); // 6 seconds
     // ... rest of logic
   }
 }
 ```
 
 **Expected Behavior:**
+
 - Job times out after 5 seconds
 - Marked as FAILED with error: "Bot decision timed out"
 - No move applied
@@ -189,6 +198,7 @@ export class EasyBotStrategy implements BotStrategy {
 ```
 
 **Expected Behavior:**
+
 - Player.row updated to 4
 - Player.col remains 5
 - turnNumber incremented
@@ -202,6 +212,7 @@ export class EasyBotStrategy implements BotStrategy {
 ```
 
 **Expected Behavior:**
+
 - Barrier created in database
 - Player.wallsLeft decremented to 5
 - blockedEdges updated in game state
@@ -212,13 +223,14 @@ export class EasyBotStrategy implements BotStrategy {
 ```sql
 -- Manually block all edges around bot:
 INSERT INTO "Barrier" ("roomId", "row", "col", "orientation")
-VALUES 
+VALUES
   (<room-id>, 4, 4, 'H'),
   (<room-id>, 5, 4, 'V');
 -- (Continue until bot is trapped)
 ```
 
 **Expected Behavior:**
+
 - Bot detects no valid moves available
 - Falls back to valid barrier placement
 - If no valid barriers either → FAILED job (edge case)
@@ -233,6 +245,7 @@ VALUES
 ```
 
 **Expected Behavior:**
+
 1. Human move completes
 2. `afterMoveCommit()` schedules Bot 1
 3. Worker processes Bot 1 → moves
@@ -244,6 +257,7 @@ VALUES
 9. Turn returns to Human
 
 **Timing:**
+
 - Each bot move happens on next cron tick (60s intervals)
 - Total delay: ~2 minutes for 2 bot moves
 
@@ -258,6 +272,7 @@ VALUES
 ```
 
 **Expected Behavior:**
+
 - `checkWin()` detects row === 10
 - Room.winner set to bot's playerId
 - Room.status set to FINISHED
@@ -283,33 +298,33 @@ SELECT code, "turnNumber", "currentPlayerId", winner FROM "Room" WHERE code = 'T
 
 ### Common Issues & Fixes
 
-| Issue | Symptom | Fix |
-|-------|---------|-----|
-| **Bot never moves** | Jobs stuck in PENDING | Check worker is running: `curl http://localhost:3000/api/cron/process-bot-jobs` |
-| **Duplicate jobs** | Multiple PENDING for same turn | Unique constraint working correctly (expected) |
-| **Stale jobs** | Jobs marked STALE | Normal behavior when turnNumber mismatches |
-| **Timeout errors** | Jobs marked FAILED | Bot strategy taking > 5s (check logs) |
-| **Invalid moves** | Jobs marked FAILED | Check pathfinding logic or blocked edges |
+| Issue               | Symptom                        | Fix                                                                             |
+| ------------------- | ------------------------------ | ------------------------------------------------------------------------------- |
+| **Bot never moves** | Jobs stuck in PENDING          | Check worker is running: `curl http://localhost:3000/api/cron/process-bot-jobs` |
+| **Duplicate jobs**  | Multiple PENDING for same turn | Unique constraint working correctly (expected)                                  |
+| **Stale jobs**      | Jobs marked STALE              | Normal behavior when turnNumber mismatches                                      |
+| **Timeout errors**  | Jobs marked FAILED             | Bot strategy taking > 5s (check logs)                                           |
+| **Invalid moves**   | Jobs marked FAILED             | Check pathfinding logic or blocked edges                                        |
 
 ### Database Queries for Testing
 
 ```sql
 -- Check bot job queue:
-SELECT 
+SELECT
   id, code, "playerId", "expectedTurn", status, error
 FROM "BotMoveJob"
 WHERE code = 'TEST01'
 ORDER BY "createdAt" DESC;
 
 -- Check bot decision history:
-SELECT 
+SELECT
   "playerId", "turnNumber", "decisionType", "fromRow", "fromCol", "toRow", "toCol"
 FROM "BotDecisionLog"
 WHERE "roomCode" = 'TEST01'
 ORDER BY "turnNumber" ASC;
 
 -- Check current game state:
-SELECT 
+SELECT
   r.code, r."turnNumber", r."currentPlayerId", r.winner,
   p."playerId", p."playerType", p.row, p.col, p."wallsLeft"
 FROM "Room" r
@@ -317,7 +332,7 @@ LEFT JOIN "Player" p ON p."roomId" = r.id
 WHERE r.code = 'TEST01';
 
 -- Check barrier placements:
-SELECT 
+SELECT
   row, col, orientation
 FROM "Barrier"
 WHERE "roomId" = (SELECT id FROM "Room" WHERE code = 'TEST01');
@@ -328,15 +343,18 @@ WHERE "roomId" = (SELECT id FROM "Room" WHERE code = 'TEST01');
 Once Phase 1 testing validates the bot system works correctly:
 
 1. **Bot Selection UI** (CreateRoom component)
+
    - Add "Allow Bots" toggle
    - Add "Bot Difficulty" selector per player slot
    - Pre-fill bot players before game starts
 
 2. **Mid-Game Replacement UI** (WaitingLobby component)
+
    - "Replace with Bot" button for disconnected players
    - Shows which players are bots vs humans
 
 3. **Bot Indicators** (GameBoard component)
+
    - Visual indicator (🤖 icon) for bot players
    - "Bot is thinking..." message during bot turns
    - Estimated time until next bot move (cron countdown)
@@ -368,10 +386,12 @@ Once all criteria met → Proceed to Phase 2 (UI Integration)
 ### Current Bottlenecks (Known)
 
 1. **Cron Interval**: 60 seconds between moves (Vercel Cron limitation)
+
    - **Impact**: Bot games take ~10-20 minutes
    - **Fix (Phase 3)**: Move to WebSocket + instant processing
 
 2. **Serial Bot Processing**: One bot at a time
+
    - **Impact**: Minimal (most games have 1-2 bots max)
    - **Fix (Phase 3)**: Parallel processing if needed
 
@@ -380,6 +400,7 @@ Once all criteria met → Proceed to Phase 2 (UI Integration)
    - **Fix (Phase 2)**: Add transition animations in UI
 
 ### Acceptable for MVP
+
 - Bot response time: < 60 seconds ✅
 - Human wait time: < 60 seconds for bot turn ✅
 - Game completion: 10-20 minutes for bot games ✅

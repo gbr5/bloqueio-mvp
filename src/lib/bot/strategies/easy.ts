@@ -14,7 +14,10 @@ export class EasyBot {
   /**
    * Select move: Easy strategy is mostly random with some goal bias
    */
-  async selectMove(gameState: GameSnapshot, playerId: number): Promise<{
+  async selectMove(
+    gameState: GameSnapshot,
+    playerId: number
+  ): Promise<{
     type: string;
     row: number;
     col: number;
@@ -97,11 +100,20 @@ export class EasyBot {
       if (newRow < 0 || newRow > 10 || newCol < 0 || newCol > 10) continue;
 
       // Check if edge is blocked
-      const edgeKey = this.normalizeEdgeKey(player.row, player.col, newRow, newCol);
+      const edgeKey = this.normalizeEdgeKey(
+        player.row,
+        player.col,
+        newRow,
+        newCol
+      );
       if (gameState.blockedEdges.has(edgeKey)) continue;
 
       // Check if occupied by another player
-      if (gameState.players.some((p) => p.playerId !== playerId && p.row === newRow && p.col === newCol)) {
+      if (
+        gameState.players.some(
+          (p) => p.playerId !== playerId && p.row === newRow && p.col === newCol
+        )
+      ) {
         continue;
       }
 
@@ -114,7 +126,12 @@ export class EasyBot {
   /**
    * Normalize edge key for consistent lookup
    */
-  private normalizeEdgeKey(r1: number, c1: number, r2: number, c2: number): string {
+  private normalizeEdgeKey(
+    r1: number,
+    c1: number,
+    r2: number,
+    c2: number
+  ): string {
     if (r1 > r2 || (r1 === r2 && c1 > c2)) {
       return `${r2},${c2}:${r1},${c1}`;
     }

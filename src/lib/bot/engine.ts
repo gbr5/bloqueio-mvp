@@ -5,11 +5,7 @@
  */
 
 import { db } from "@/lib/db";
-import type {
-  GameSnapshot,
-  PlayerSnapshot,
-  BarrierSnapshot,
-} from "./types";
+import type { GameSnapshot, PlayerSnapshot, BarrierSnapshot } from "./types";
 import { EasyBot } from "./strategies/easy";
 import { SeededRNG } from "./rng";
 import { afterMoveCommit } from "./scheduler";

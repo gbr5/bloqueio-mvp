@@ -1251,12 +1251,17 @@ export default function BloqueioPage({
       return `${p.name} venceu!`;
     }
 
-    let baseText = `Vez de ${currentPlayer?.name} (${
-      mode === "move" ? "mover peão" : "colocar barreira"
-    })`;
+    // Check if current player is a bot
+    const isBot = currentPlayer?.playerType && currentPlayer.playerType !== "HUMAN";
+    
+    let baseText = isBot
+      ? `🤖 Bot está pensando... (${currentPlayer?.name})`
+      : `Vez de ${currentPlayer?.name} (${
+          mode === "move" ? "mover peão" : "colocar barreira"
+        })`;
 
-    // Add hint for mobile preview mode
-    if (isMobile && mode === "wall" && mobilePreviewBarrier) {
+    // Add hint for mobile preview mode (only for human players)
+    if (!isBot && isMobile && mode === "wall" && mobilePreviewBarrier) {
       baseText += " - Toque para reposicionar";
     }
 
@@ -1613,6 +1618,13 @@ export default function BloqueioPage({
                       }}
                     >
                       {p?.name}
+                      {p.playerType && p.playerType !== "HUMAN" && (
+                        <span
+                          style={{ marginLeft: "0.5rem", fontSize: "0.875rem" }}
+                        >
+                          🤖
+                        </span>
+                      )}
                     </span>
                     <span style={{ color: "#9ca3af", marginLeft: "auto" }}>
                       Barreiras: {p.wallsLeft}/{modeConfig.wallsPerPlayer}
