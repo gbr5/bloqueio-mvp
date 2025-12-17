@@ -543,6 +543,7 @@ function createInitialPlayers(gameMode: GameMode = "FOUR_PLAYER"): Player[] {
 - [ ] Manual testing: full 4P game flow (ensure no regression)
 
 **Testing Resources:**
+
 - Dev server running at http://localhost:3000
 - Testing guide: `docs/progress/PHASE5_TESTING_GUIDE.md`
 - Unit tests created: `__tests__/two-player-mode.test.ts` (3/3 passing)

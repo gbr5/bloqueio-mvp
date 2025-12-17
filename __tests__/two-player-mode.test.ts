@@ -27,10 +27,10 @@ describe("Two-Player Mode Configuration", () => {
 
   test("should return only top and bottom players for 2P mode", () => {
     const config = getGameModeConfig("TWO_PLAYER");
-    
+
     // In a real implementation, createInitialPlayers would use this config
     const playerSlots = config.playerSlots;
-    
+
     expect(playerSlots.length).toBe(2);
     expect(playerSlots).toContain(0); // Top player
     expect(playerSlots).toContain(2); // Bottom player

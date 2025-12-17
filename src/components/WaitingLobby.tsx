@@ -1,3 +1,4 @@
+// src/components/WaitingLobby.tsx
 /**
  * WaitingLobby Component
  *
@@ -16,15 +17,11 @@ import { startGame } from "@/lib/actions/game-actions";
 import { POLLING_INTERVALS } from "@/config/polling";
 import { AuthOrGuestModal } from "./AuthOrGuestModal";
 import { getGameModeConfig, type GameMode } from "@/types/game";
-import type { Room, Player } from "@prisma/client";
+import type { RoomWithPlayers } from "@/types/room";
 
 interface WaitingLobbyProps {
   roomCode: string;
 }
-
-type RoomWithPlayers = Room & {
-  players: Player[];
-};
 
 export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
   const router = useRouter();

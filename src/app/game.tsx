@@ -416,9 +416,19 @@ export default function BloqueioPage({
   mobilePreviewRef.current = mobilePreviewBarrier;
   wallOrientationRef.current = wallOrientation;
 
-  const currentPlayer = players.find((p) => p.id === currentPlayerId)!;
+  const currentPlayer = players.find((p) => p.id === currentPlayerId);
 
-  // Mobile detection effect
+  // Safety check: if currentPlayer is undefined, reset to first player
+  useEffect(() => {
+    if (!currentPlayer && players.length > 0) {
+      console.error(
+        `[BloqueioPage] currentPlayerId ${currentPlayerId} not found in players:`,
+        players.map((p) => ({ id: p.id, name: p.name }))
+      );
+      // Reset to first player
+      updateGameState({ currentPlayerId: players[0].id });
+    }
+  }, [currentPlayerId, players, currentPlayer]);
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 640);
     checkMobile();
@@ -592,6 +602,7 @@ export default function BloqueioPage({
   function canMoveTo(row: number, col: number): boolean {
     if (winner !== null) return false;
     const cur = currentPlayer;
+    if (!cur) return false; // Safety check
     return canPawnMoveTo(cur, row, col, blockedEdges, players);
   }
 
@@ -620,7 +631,7 @@ export default function BloqueioPage({
       };
     }
 
-    if (currentPlayer.wallsLeft <= 0) {
+    if (currentPlayer && currentPlayer.wallsLeft <= 0) {
       if (!silent) toast.error("Sem barreiras restantes!");
       return {
         ok: false,
@@ -834,7 +845,7 @@ export default function BloqueioPage({
 
   function handleMove(row: number, col: number) {
     if (!canMoveTo(row, col)) return;
-
+    if (!currentPlayer) return; // Safety check
     const cur = currentPlayer;
     pushSnapshot();
 
@@ -866,6 +877,7 @@ export default function BloqueioPage({
 
   function confirmBarrierPlacement() {
     if (!pendingBarrier) return;
+    if (!currentPlayer) return; // Safety check
 
     const { baseRow, baseCol, orientation, edgesToAdd } = pendingBarrier;
 
@@ -1039,7 +1051,9 @@ export default function BloqueioPage({
               ? "0 0 0 2px #ef4444 inset" // Red for invalid mobile preview
               : isAllowedHover
               ? `0 0 0 2px ${
-                  mode === "move" ? currentPlayer.color : "#facc15"
+                  mode === "move"
+                    ? currentPlayer?.color ?? "#ffffff"
+                    : "#facc15"
                 } inset`
               : "none",
             transition: "box-shadow 0.08s ease-out, background 0.08s ease-out",
@@ -1090,7 +1104,7 @@ export default function BloqueioPage({
     if (pending) {
       barrierColor = "#f59e0b"; // Amber color for pending confirmation
     } else if (ghost) {
-      barrierColor = currentPlayer.color;
+      barrierColor = currentPlayer?.color ?? "#ffffff";
     } else if (b.placedBy !== undefined) {
       const placer = players.find((p) => p.id === b.placedBy);
       barrierColor = placer?.color ?? "#facc15";
@@ -1211,7 +1225,7 @@ export default function BloqueioPage({
       return `${p.name} venceu!`;
     }
 
-    let baseText = `Vez de ${currentPlayer.name} (${
+    let baseText = `Vez de ${currentPlayer?.name} (${
       mode === "move" ? "mover peão" : "colocar barreira"
     })`;
 
@@ -1277,7 +1291,7 @@ export default function BloqueioPage({
               fontSize: "clamp(0.8rem, 3vw, 0.95rem)",
               padding: "0.3rem 0.8rem",
               borderRadius: 999,
-              background: currentPlayer.color,
+              background: currentPlayer?.color ?? "#ffffff",
               border: "1px solid #1f2937",
               textAlign: "center",
             }}
@@ -1392,7 +1406,7 @@ export default function BloqueioPage({
                 >
                   Mover peão
                 </button>
-                {currentPlayer.wallsLeft > 0 && (
+                {currentPlayer && currentPlayer.wallsLeft > 0 && (
                   <button
                     type="button"
                     onClick={() => setMode("wall")}
@@ -1572,7 +1586,7 @@ export default function BloqueioPage({
                             : 500,
                       }}
                     >
-                      {p.name}
+                      {p?.name}
                     </span>
                     <span style={{ color: "#9ca3af", marginLeft: "auto" }}>
                       Barreiras: {p.wallsLeft}/{modeConfig.wallsPerPlayer}
@@ -1626,9 +1640,9 @@ export default function BloqueioPage({
           />
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: "0.9rem", color: "#e5e7eb" }}>
-              Você tem <strong>{currentPlayer.wallsLeft}</strong> barreira
-              {currentPlayer.wallsLeft !== 1 ? "s" : ""} restante
-              {currentPlayer.wallsLeft !== 1 ? "s" : ""}.
+              Você tem <strong>{currentPlayer?.wallsLeft ?? 0}</strong> barreira
+              {(currentPlayer?.wallsLeft ?? 0) !== 1 ? "s" : ""} restante
+              {(currentPlayer?.wallsLeft ?? 0) !== 1 ? "s" : ""}.
             </p>
             <p style={{ fontSize: "0.8rem", color: "#9ca3af", marginTop: 4 }}>
               A barreira está destacada em âmbar no tabuleiro.
