@@ -427,16 +427,26 @@ describe("joinRoom with gameMode", () => {
 
 ### Phase 3: UI Components (Day 2, Morning)
 
-**Duration:** 4-5 hours
+**Duration:** 4-5 hours  
+**Status:** ✅ COMPLETE
 
 **Tasks:**
 
-- [ ] Add mode selection to `CreateRoom.tsx`
-- [ ] Design mode selection UI (radio cards with visual indicators)
-- [ ] Update `WaitingLobby.tsx` to show game mode badge
-- [ ] Limit player slots rendering based on mode
-- [ ] Update start button validation
-- [ ] Add mode information tooltip/help text
+- [x] Add mode selection to `CreateRoom.tsx`
+- [x] Design mode selection UI (radio cards with visual indicators)
+- [x] Update `WaitingLobby.tsx` to show game mode badge
+- [x] Limit player slots rendering based on mode
+- [x] Update start button validation
+- [x] Add mode information tooltip/help text
+
+**Implementation Notes:**
+
+- CreateRoom component now displays two mode cards (2P and 4P) with emoji icons
+- Selected mode is passed to createRoom() server action
+- WaitingLobby shows game mode badge with appropriate styling
+- Player slots are dynamically rendered based on gameMode (2 for 2P, 4 for 4P)
+- Start button validation updated to require exact player count for 2P mode
+- Fixed React effect warning by initializing guestName from localStorage correctly
 
 **UI Mockup:**
 
@@ -464,7 +474,8 @@ describe("joinRoom with gameMode", () => {
 
 ### Phase 4: Game Logic (Day 2, Afternoon)
 
-**Duration:** 3-4 hours
+**Duration:** 3-4 hours  
+**Status:** 🔄 IN PROGRESS
 
 **Tasks:**
 
@@ -474,6 +485,12 @@ describe("joinRoom with gameMode", () => {
 - [ ] Ensure pathfinding works with 2 players
 - [ ] Test jump mechanics with 2 players only
 - [ ] Update game state synchronization
+
+**Blockers:**
+
+- Need to integrate gameMode prop into GameBoard component
+- Must update game.tsx to handle 2-player initialization
+- Barrier counter needs dynamic max value based on mode
 
 **Game.tsx Changes:**
 

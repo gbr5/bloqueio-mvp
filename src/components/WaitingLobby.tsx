@@ -145,7 +145,9 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
 
   const isHost = myPlayerId === 0;
   const playerCount = room.players.length;
-  const config = getGameModeConfig((room.gameMode as GameMode) || "FOUR_PLAYER");
+  const config = getGameModeConfig(
+    (room.gameMode as GameMode) || "FOUR_PLAYER"
+  );
   const canStart =
     isHost &&
     playerCount >= config.minPlayers &&
