@@ -395,9 +395,11 @@ export default function BloqueioPage({
   } | null>(null);
   const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const mobilePreviewRef = useRef<{ row: number; col: number } | null>(null);
+  const wallOrientationRef = useRef<Orientation>("H");
 
-  // Keep ref in sync with state
+  // Keep refs in sync with state
   mobilePreviewRef.current = mobilePreviewBarrier;
+  wallOrientationRef.current = wallOrientation;
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId)!;
 
@@ -424,29 +426,62 @@ export default function BloqueioPage({
     }
   }, [mode, isMobile]);
 
-  // Start inactivity timer - triggers confirmation modal after 5 seconds
+  // Start inactivity timer - triggers confirmation modal after 2 seconds
   const startInactivityTimer = useCallback(() => {
     // Clear existing timeout
     if (inactivityTimeoutRef.current) {
       clearTimeout(inactivityTimeoutRef.current);
     }
 
-    // Start new 5-second timeout
+    // Start new 2-second timeout
     inactivityTimeoutRef.current = setTimeout(() => {
-      // Use ref to get current preview position (avoids stale closure)
+      // Use refs to get current values (avoids stale closure)
       const preview = mobilePreviewRef.current;
+      const orientation = wallOrientationRef.current;
       if (!preview) return;
 
-      // Validate the placement
-      const result = checkWallPlacement(preview.row, preview.col, { silent: false });
-      if (!result.ok) return;
+      // Calculate base position (same logic as checkWallPlacement)
+      const clickRow = preview.row;
+      const clickCol = preview.col;
+      let baseRow: number;
+      let baseCol: number;
 
-      const { baseRow, baseCol, orientation, edgesToAdd } = result;
+      if (orientation === "H") {
+        if (clickRow === INNER_SIZE) {
+          baseRow = INNER_SIZE;
+        } else {
+          baseRow = Math.max(0, clickRow - 1);
+        }
+        baseCol = Math.max(0, Math.min(clickCol - 1, SIZE - 3));
+        if (clickCol >= INNER_SIZE - 1) {
+          baseCol = SIZE - 3;
+        }
+      } else {
+        if (clickCol === INNER_SIZE) {
+          baseCol = INNER_SIZE;
+        } else {
+          baseCol = Math.max(0, clickCol - 1);
+        }
+        baseRow = Math.max(0, Math.min(clickRow - 1, SIZE - 3));
+        if (clickRow >= INNER_SIZE - 1) {
+          baseRow = SIZE - 3;
+        }
+      }
+
+      // Calculate edges
+      const edgesToAdd: string[] = [];
+      if (orientation === "H") {
+        edgesToAdd.push(edgeKey(baseRow, baseCol, baseRow + 1, baseCol));
+        edgesToAdd.push(edgeKey(baseRow, baseCol + 1, baseRow + 1, baseCol + 1));
+      } else {
+        edgesToAdd.push(edgeKey(baseRow, baseCol, baseRow, baseCol + 1));
+        edgesToAdd.push(edgeKey(baseRow + 1, baseCol, baseRow + 1, baseCol + 1));
+      }
 
       // Set pending barrier and show confirmation modal
       setPendingBarrier({ baseRow, baseCol, orientation, edgesToAdd });
       setShowBarrierConfirmation(true);
-    }, 5000);
+    }, 2000);
   }, []);
 
   // Reset timer whenever preview position changes
@@ -610,8 +645,13 @@ export default function BloqueioPage({
       } else {
         baseRow = Math.max(0, clickRow - 1);
       }
-      // baseCol: clicking col 1 → baseCol 0, clicking col 9 → baseCol 8 (max)
+      // baseCol: use click position directly, clamped to valid range 0-8
+      // This allows placing barrier at the clicked column's right edge
       baseCol = Math.max(0, Math.min(clickCol - 1, SIZE - 3)); // 0 to 8
+      // Special case: clicking col 9 or 8 should both allow placing at baseCol 8
+      if (clickCol >= INNER_SIZE - 1) {
+        baseCol = SIZE - 3; // 8
+      }
     } else {
       // Vertical barriers: baseCol can be 0-9, baseRow can be 0-8
       // Clicking col 9 → baseCol 9 (right border), clicking col 1 → baseCol 0 (left border)
@@ -620,8 +660,12 @@ export default function BloqueioPage({
       } else {
         baseCol = Math.max(0, clickCol - 1);
       }
-      // baseRow: clicking row 1 → baseRow 0, clicking row 9 → baseRow 8 (max)
+      // baseRow: use click position directly, clamped to valid range 0-8
       baseRow = Math.max(0, Math.min(clickRow - 1, SIZE - 3)); // 0 to 8
+      // Special case: clicking row 9 or 8 should both allow placing at baseRow 8
+      if (clickRow >= INNER_SIZE - 1) {
+        baseRow = SIZE - 3; // 8
+      }
     }
 
     const edgesToAdd: string[] = [];
