@@ -1,6 +1,6 @@
 "use client";
 
-import { JSX, useState, useEffect } from "react";
+import { JSX, useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "@/lib/toast";
 import {
   Modal,
@@ -387,7 +387,78 @@ export default function BloqueioPage({
   } | null>(null);
   const [showBarrierConfirmation, setShowBarrierConfirmation] = useState(false);
 
+  // Mobile barrier preview state
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [mobilePreviewBarrier, setMobilePreviewBarrier] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const currentPlayer = players.find((p) => p.id === currentPlayerId)!;
+
+  // Mobile detection effect
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Initialize mobile preview when entering wall mode on mobile
+  useEffect(() => {
+    if (mode === "wall" && isMobile) {
+      // Initialize preview at center (row 5, col 5)
+      setMobilePreviewBarrier({ row: 5, col: 5 });
+    } else if (mode !== "wall") {
+      // Clear preview when exiting wall mode
+      setMobilePreviewBarrier(null);
+      if (inactivityTimeoutRef.current) {
+        clearTimeout(inactivityTimeoutRef.current);
+        inactivityTimeoutRef.current = null;
+      }
+    }
+  }, [mode, isMobile]);
+
+  // Inactivity timer - triggers confirmation modal after 5 seconds
+  const triggerMobileConfirmation = useCallback(() => {
+    if (!mobilePreviewBarrier) return;
+
+    // Validate the placement
+    const result = checkWallPlacement(mobilePreviewBarrier.row, mobilePreviewBarrier.col, { silent: false });
+    if (!result.ok) return;
+
+    const { baseRow, baseCol, orientation, edgesToAdd } = result;
+
+    // Set pending barrier and show confirmation modal
+    setPendingBarrier({ baseRow, baseCol, orientation, edgesToAdd });
+    setShowBarrierConfirmation(true);
+  }, [mobilePreviewBarrier, wallOrientation, currentPlayer.wallsLeft, blockedEdges, barriers, players, winner]);
+
+  const startInactivityTimer = useCallback(() => {
+    // Clear existing timeout
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
+    }
+
+    // Start new 5-second timeout
+    inactivityTimeoutRef.current = setTimeout(() => {
+      triggerMobileConfirmation();
+    }, 5000);
+  }, [triggerMobileConfirmation]);
+
+  // Reset timer whenever preview position changes
+  useEffect(() => {
+    if (mode === "wall" && isMobile && mobilePreviewBarrier) {
+      startInactivityTimer();
+    }
+
+    return () => {
+      if (inactivityTimeoutRef.current) {
+        clearTimeout(inactivityTimeoutRef.current);
+      }
+    };
+  }, [mode, isMobile, mobilePreviewBarrier, startInactivityTimer]);
 
   // Helper to update game state (works for both controlled and uncontrolled)
   function updateGameState(updates: Partial<GameSnapshot>) {
@@ -677,7 +748,14 @@ export default function BloqueioPage({
     if (mode === "move") {
       handleMove(row, col);
     } else {
-      handleWallClick(row, col);
+      // Wall mode
+      if (isMobile) {
+        // Mobile: tap to reposition preview (timer handles confirmation)
+        setMobilePreviewBarrier({ row, col });
+      } else {
+        // Desktop: immediate validation and confirmation
+        handleWallClick(row, col);
+      }
     }
   }
 
@@ -751,6 +829,16 @@ export default function BloqueioPage({
   function cancelBarrierPlacement() {
     setPendingBarrier(null);
     setShowBarrierConfirmation(false);
+
+    // On mobile, cancel returns to move mode
+    if (isMobile) {
+      setMode("move");
+      setMobilePreviewBarrier(null);
+      if (inactivityTimeoutRef.current) {
+        clearTimeout(inactivityTimeoutRef.current);
+        inactivityTimeoutRef.current = null;
+      }
+    }
   }
 
   function handleRestart() {
@@ -804,10 +892,28 @@ export default function BloqueioPage({
 
       // hover de jogada válida
       let isAllowedHover = false;
-      if (isHovered) {
-        if (mode === "move") {
+      let isMobilePreviewCell = false;
+      let isMobileInvalidPreview = false;
+
+      if (mode === "move") {
+        if (isHovered) {
           isAllowedHover = canMoveTo(row, col);
-        } else {
+        }
+      } else {
+        // Wall mode
+        if (isMobile && mobilePreviewBarrier) {
+          // Mobile: highlight the preview position
+          if (row === mobilePreviewBarrier.row && col === mobilePreviewBarrier.col) {
+            isMobilePreviewCell = true;
+            const result = checkWallPlacement(row, col, { silent: true });
+            if (result.ok) {
+              isAllowedHover = true;
+            } else {
+              isMobileInvalidPreview = true;
+            }
+          }
+        } else if (isHovered && !isMobile) {
+          // Desktop: highlight hovered cell
           const result = checkWallPlacement(row, col, { silent: true });
           isAllowedHover = result.ok;
         }
@@ -850,10 +956,12 @@ export default function BloqueioPage({
             cursor:
               winner !== null
                 ? "default"
-                : isAllowedHover
+                : isAllowedHover || isMobilePreviewCell
                 ? "pointer"
                 : "not-allowed",
-            boxShadow: isAllowedHover
+            boxShadow: isMobileInvalidPreview
+              ? "0 0 0 2px #ef4444 inset" // Red for invalid mobile preview
+              : isAllowedHover
               ? `0 0 0 2px ${
                   mode === "move" ? currentPlayer.color : "#facc15"
                 } inset`
@@ -985,7 +1093,22 @@ export default function BloqueioPage({
       id: "pending",
     };
     ghostBarrier = renderBarrier(pending, { ghost: true, pending: true });
-  } else if (mode === "wall" && hoveredCell) {
+  } else if (isMobile && mode === "wall" && mobilePreviewBarrier) {
+    // Mobile preview mode: show barrier at preview position
+    const res = checkWallPlacement(mobilePreviewBarrier.row, mobilePreviewBarrier.col, {
+      silent: true,
+    });
+    if (res.ok) {
+      const ghost: Barrier = {
+        row: res.baseRow,
+        col: res.baseCol,
+        orientation: res.orientation,
+        id: "ghost-mobile",
+      };
+      ghostBarrier = renderBarrier(ghost, { ghost: true });
+    }
+  } else if (mode === "wall" && hoveredCell && !isMobile) {
+    // Desktop hover preview (only when not mobile)
     const res = checkWallPlacement(hoveredCell.row, hoveredCell.col, {
       silent: true,
     });
@@ -1005,9 +1128,17 @@ export default function BloqueioPage({
       const p = players.find((pl) => pl.id === winner)!;
       return `${p.name} venceu!`;
     }
-    return `Vez de ${currentPlayer.name} (${
+
+    let baseText = `Vez de ${currentPlayer.name} (${
       mode === "move" ? "mover peão" : "colocar barreira"
     })`;
+
+    // Add hint for mobile preview mode
+    if (isMobile && mode === "wall" && mobilePreviewBarrier) {
+      baseText += " - Toque para reposicionar";
+    }
+
+    return baseText;
   })();
 
   return (
@@ -1253,7 +1384,10 @@ export default function BloqueioPage({
                 >
                   <button
                     type="button"
-                    onClick={() => setWallOrientation("H")}
+                    onClick={() => {
+                      setWallOrientation("H");
+                      if (isMobile && mode === "wall") startInactivityTimer();
+                    }}
                     style={{
                       padding: "0.35rem 0.75rem",
                       borderRadius: 999,
@@ -1274,7 +1408,10 @@ export default function BloqueioPage({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setWallOrientation("V")}
+                    onClick={() => {
+                      setWallOrientation("V");
+                      if (isMobile && mode === "wall") startInactivityTimer();
+                    }}
                     style={{
                       padding: "0.35rem 0.75rem",
                       borderRadius: 999,
