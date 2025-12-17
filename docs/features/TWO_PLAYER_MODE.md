@@ -528,11 +528,12 @@ function createInitialPlayers(gameMode: GameMode = "FOUR_PLAYER"): Player[] {
 
 ### Phase 5: Testing & QA (Day 3, Morning)
 
-**Duration:** 3-4 hours
+**Duration:** 3-4 hours  
+**Status:** 🔄 IN PROGRESS
 
 **Tasks:**
 
-- [ ] Write unit tests for mode selection logic
+- [x] Write unit tests for mode selection logic
 - [ ] Test 2P room creation and joining
 - [ ] Test 4P room creation and joining (regression)
 - [ ] Test barrier placement in 2P mode (12 barriers)
@@ -540,6 +541,11 @@ function createInitialPlayers(gameMode: GameMode = "FOUR_PLAYER"): Player[] {
 - [ ] Test game completion in 2P mode
 - [ ] Manual testing: full 2P game flow
 - [ ] Manual testing: full 4P game flow (ensure no regression)
+
+**Testing Resources:**
+- Dev server running at http://localhost:3000
+- Testing guide: `docs/progress/PHASE5_TESTING_GUIDE.md`
+- Unit tests created: `__tests__/two-player-mode.test.ts` (3/3 passing)
 
 **Test Scenarios:**
 
