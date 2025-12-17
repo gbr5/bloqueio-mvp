@@ -15,6 +15,9 @@ export type PlayerId = 0 | 1 | 2 | 3;
 /** Goal sides - which border edge each player must reach to win */
 export type GoalSide = "TOP" | "RIGHT" | "BOTTOM" | "LEFT";
 
+/** Game mode - 2-player or 4-player */
+export type GameMode = "TWO_PLAYER" | "FOUR_PLAYER";
+
 /** Game mode - either moving pawns or placing barriers */
 export type Mode = "move" | "wall";
 
@@ -76,7 +79,7 @@ export interface Barrier {
 // ============================================================================
 
 export interface GameSnapshot {
-  /** All 4 players and their current positions */
+  /** All players and their current positions (2 or 4 depending on mode) */
   players: Player[];
   /** Set of blocked edges between cells (serialized as strings) */
   blockedEdges: string[];
@@ -86,6 +89,8 @@ export interface GameSnapshot {
   currentPlayerId: PlayerId;
   /** ID of winning player, or null if game is ongoing */
   winner: PlayerId | null;
+  /** Game mode - 2 or 4 players */
+  gameMode?: GameMode;
 }
 
 // ============================================================================
@@ -115,6 +120,26 @@ export interface GameRoom {
 // ============================================================================
 // Constants
 // ============================================================================
+
+/** Game mode configuration */
+export const GAME_MODE_CONFIG = {
+  TWO_PLAYER: {
+    maxPlayers: 2,
+    wallsPerPlayer: 12,
+    minPlayers: 2,
+    playerSlots: [0, 2] as const, // Top and Bottom positions only
+    label: "2 Jogadores",
+    description: "Duelo clássico - 12 barreiras cada",
+  },
+  FOUR_PLAYER: {
+    maxPlayers: 4,
+    wallsPerPlayer: 6,
+    minPlayers: 2,
+    playerSlots: [0, 1, 2, 3] as const, // All positions
+    label: "4 Jogadores",
+    description: "Modo padrão - 6 barreiras cada",
+  },
+} as const;
 
 /** Player base colors (semi-transparent for board overlay) */
 export const PLAYER_BASE_COLORS: Record<PlayerId, string> = {

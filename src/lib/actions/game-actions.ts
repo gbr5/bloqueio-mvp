@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { getOrCreateSessionId } from "@/lib/session";
 import type { GoalSide, Prisma } from "@prisma/client";
+import { GAME_MODE_CONFIG } from "@/types/game";
 
 /**
  * Check if a player has reached their goal
@@ -497,9 +498,27 @@ export async function startGame(
     if (room.hostId !== sessionId) {
       return { error: "Only host can start the game" };
     }
-    if (room.players.length < 2) {
-      return { error: "Need at least 2 players to start" };
+    
+    const config = GAME_MODE_CONFIG[room.gameMode];
+    
+    // Validate player count based on game mode
+    if (room.players.length < config.minPlayers) {
+      return { 
+        error: room.gameMode === "TWO_PLAYER" 
+          ? "Precisa de exatamente 2 jogadores para começar" 
+          : "Precisa de pelo menos 2 jogadores para começar"
+      };
     }
+    
+    if (room.players.length > config.maxPlayers) {
+      return { error: `Muitos jogadores para o modo ${config.label}` };
+    }
+    
+    // Additional validation for 2P mode: must have exactly 2 players
+    if (room.gameMode === "TWO_PLAYER" && room.players.length !== 2) {
+      return { error: "Modo 2 jogadores requer exatamente 2 jogadores" };
+    }
+    
     if (room.status !== "WAITING") {
       return { error: "Game already started" };
     }
