@@ -545,7 +545,7 @@ export default function BloqueioPage({
     // Find current player index in the players array
     const currentIndex = players.findIndex((p) => p.id === id);
     if (currentIndex === -1) return players[0].id; // Fallback to first player
-    
+
     // Get next player in circular fashion
     const nextIndex = (currentIndex + 1) % players.length;
     return players[nextIndex].id;
