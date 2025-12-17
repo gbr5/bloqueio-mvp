@@ -6,6 +6,20 @@ import type { GoalSide, Prisma } from "@prisma/client";
 import { getGameModeConfig, type GameMode } from "@/types/game";
 
 /**
+ * Get next player ID - works for both 2P and 4P modes
+ * Cycles through actual player IDs, not array indices
+ */
+function getNextPlayerId(
+  currentPlayerId: number,
+  players: Array<{ playerId: number }>
+): number {
+  const currentIndex = players.findIndex((p) => p.playerId === currentPlayerId);
+  if (currentIndex === -1) return players[0].playerId;
+  const nextIndex = (currentIndex + 1) % players.length;
+  return players[nextIndex].playerId;
+}
+
+/**
  * Check if a player has reached their goal
  */
 function checkWin(goalSide: GoalSide, row: number, col: number): boolean {
@@ -88,7 +102,7 @@ export async function makeMove(
         data: {
           currentTurn: isWin
             ? room.currentTurn
-            : (room.currentTurn + 1) % room.players.length,
+            : getNextPlayerId(room.currentTurn, room.players),
           winner: isWin ? player.playerId : room.winner,
           status: isWin ? "FINISHED" : room.status,
         },
@@ -353,7 +367,7 @@ export async function placeBarrier(
       db.room.update({
         where: { id: room.id },
         data: {
-          currentTurn: (room.currentTurn + 1) % room.players.length,
+          currentTurn: getNextPlayerId(room.currentTurn, room.players),
         },
       }),
     ]);
