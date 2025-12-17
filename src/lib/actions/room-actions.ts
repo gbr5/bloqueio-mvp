@@ -4,8 +4,8 @@ import { db } from "@/lib/db";
 import { getOrCreateSessionId, getGuestName } from "@/lib/session";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import type { GoalSide, BarrierOrientation, GameMode } from "@prisma/client";
-import { GAME_MODE_CONFIG } from "@/types/game";
+import type { GoalSide } from "@prisma/client";
+import { getGameModeConfig, type GameMode } from "@/types/game";
 
 /**
  * Generate a random 6-character room code (uppercase letters and numbers)
@@ -59,16 +59,13 @@ const PLAYER_CONFIGS = [
  */
 export async function createRoom(
   gameMode: GameMode = "FOUR_PLAYER"
-): Promise<
-  { code: string; playerId: number } | { error: string }
-> {
+): Promise<{ code: string; playerId: number } | { error: string }> {
   try {
     // Validate gameMode
     if (gameMode !== "TWO_PLAYER" && gameMode !== "FOUR_PLAYER") {
       return { error: "Invalid game mode" };
     }
 
-    const config = GAME_MODE_CONFIG[gameMode];
     const sessionId = await getOrCreateSessionId();
 
     // Get current user from Better Auth (if logged in)
@@ -110,7 +107,7 @@ export async function createRoom(
             row: config.row,
             col: config.col,
             goalSide: config.goalSide,
-            wallsLeft: GAME_MODE_CONFIG[gameMode].wallsPerPlayer, // Dynamic based on mode
+            wallsLeft: getGameModeConfig(gameMode).wallsPerPlayer, // Dynamic based on mode
           },
         },
       },
@@ -157,18 +154,19 @@ export async function joinRoom(
     });
 
     if (!room) return { error: "Sala não encontrada" };
-    
-    const config = GAME_MODE_CONFIG[room.gameMode];
-    
+
+    const config = getGameModeConfig(room.gameMode as GameMode);
+
     // Check player limit based on game mode
     if (room.players.length >= config.maxPlayers) {
-      return { 
-        error: room.gameMode === "TWO_PLAYER" 
-          ? "Sala cheia (2/2 jogadores)" 
-          : "Sala cheia (4/4 jogadores)"
+      return {
+        error:
+          room.gameMode === "TWO_PLAYER"
+            ? "Sala cheia (2/2 jogadores)"
+            : "Sala cheia (4/4 jogadores)",
       };
     }
-    
+
     if (room.status !== "WAITING") return { error: "Jogo já iniciado" };
 
     // Check if user already joined (if authenticated)
@@ -183,8 +181,10 @@ export async function joinRoom(
 
     // Find next available player slot based on game mode
     const takenIds = new Set(room.players.map((p) => p.playerId));
-    const availableSlots = config.playerSlots.filter((id) => !takenIds.has(id));
-    
+    const availableSlots = config.playerSlots.filter(
+      (id: number) => !takenIds.has(id)
+    );
+
     if (availableSlots.length === 0) {
       return { error: "Sala cheia" };
     }

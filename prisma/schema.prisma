@@ -117,8 +117,8 @@ enum RoomStatus {
 }
 
 enum GameMode {
-  TWO_PLAYER   // 2 players, 12 barriers each
-  FOUR_PLAYER  // 4 players, 6 barriers each
+  TWO_PLAYER // 2 players, 12 barriers each
+  FOUR_PLAYER // 4 players, 6 barriers each
 }
 
 // Player in a specific room

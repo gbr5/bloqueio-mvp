@@ -178,3 +178,13 @@ export function isPlayerId(id: number): id is PlayerId {
 export function isOrientation(value: string): value is Orientation {
   return value === "H" || value === "V";
 }
+
+/** Type guard to check if a value is a valid GameMode */
+export function isGameMode(value: string): value is GameMode {
+  return value === "TWO_PLAYER" || value === "FOUR_PLAYER";
+}
+
+/** Helper to safely access GAME_MODE_CONFIG */
+export function getGameModeConfig(mode: GameMode) {
+  return GAME_MODE_CONFIG[mode];
+}

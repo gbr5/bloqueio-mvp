@@ -347,14 +347,15 @@ export async function startGame(code: string) {
 
 ### Phase 1: Database & Types (Day 1, Morning)
 
-**Duration:** 2-3 hours
+**Duration:** 2-3 hours  
+**Status:** ✅ COMPLETE
 
 **Tasks:**
 
-- [ ] Create Prisma migration for `gameMode` field
-- [ ] Run migration on local database
-- [ ] Update TypeScript types in `src/types/game.ts`
-- [ ] Add `GAME_MODE_CONFIG` constants
+- [x] Create Prisma migration for `gameMode` field
+- [x] Run migration on local database
+- [x] Update TypeScript types in `src/types/game.ts`
+- [x] Add `GAME_MODE_CONFIG` constants
 - [ ] Update mock data in tests to include gameMode
 
 **Validation:**
@@ -370,15 +371,16 @@ pnpm exec prisma migrate deploy
 
 ### Phase 2: Server Actions (Day 1, Afternoon)
 
-**Duration:** 3-4 hours
+**Duration:** 3-4 hours  
+**Status:** ✅ COMPLETE
 
 **Tasks:**
 
-- [ ] Update `createRoom()` to accept gameMode parameter
-- [ ] Update `joinRoom()` to enforce mode-based player limits
-- [ ] Update `startGame()` to validate mode-specific requirements
-- [ ] Add gameMode to room query responses
-- [ ] Update player initialization logic for wallsLeft
+- [x] Update `createRoom()` to accept gameMode parameter
+- [x] Update `joinRoom()` to enforce mode-based player limits
+- [x] Update `startGame()` to validate mode-specific requirements
+- [x] Add gameMode to room query responses
+- [x] Update player initialization logic for wallsLeft
 
 **Testing:**
 
