@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 // src/components/WaitingLobby.tsx
 /**
  * WaitingLobby Component
@@ -16,6 +17,7 @@ import { getRoomState } from "@/lib/actions/room-actions";
 import { startGame } from "@/lib/actions/game-actions";
 import { POLLING_INTERVALS } from "@/config/polling";
 import { AuthOrGuestModal } from "./AuthOrGuestModal";
+import { Loading } from "./Loading";
 import { getGameModeConfig, type GameMode } from "@/types/game";
 import type { RoomWithPlayers } from "@/types/room";
 
@@ -80,6 +82,19 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
     return () => clearInterval(interval);
   }, [roomCode, router]);
 
+  // Auto-start game when room is full
+  useEffect(() => {
+    if (!room || starting) return;
+
+    const config = getGameModeConfig(room.gameMode);
+    const playerCount = room.players.length;
+
+    // If room is full and we're the host, auto-start
+    if (playerCount === config.maxPlayers && myPlayerId === room.hostId) {
+      handleStartGame();
+    }
+  }, [room, myPlayerId, starting]);
+
   const handleStartGame = async () => {
     if (!room) return;
 
@@ -117,7 +132,7 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <Loading size="xl" color="border-blue-500" className="mx-auto mb-4" />
           <p className="text-slate-400">Carregando lobby...</p>
         </div>
       </div>
@@ -255,7 +270,7 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
             >
               {starting ? (
                 <>
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white" />
+                  <Loading size="md" />
                   <span>Iniciando Jogo...</span>
                 </>
               ) : (

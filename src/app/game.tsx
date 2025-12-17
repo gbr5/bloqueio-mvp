@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
 import { JSX, useState, useEffect, useRef, useCallback } from "react";
@@ -350,7 +351,6 @@ function canPawnMoveTo(
 export default function BloqueioPage({
   gameState: externalGameState,
   onGameStateChange,
-  myPlayerId,
   disabled = false,
   gameMode = "FOUR_PLAYER", // Default to 4-player mode
 }: BloqueioPageProps = {}) {
@@ -665,42 +665,68 @@ export default function BloqueioPage({
     // Horizontal barrier at baseRow blocks edges between rows baseRow and baseRow+1
     // Vertical barrier at baseCol blocks edges between cols baseCol and baseCol+1
     //
-    // Valid ranges depend on orientation:
-    // - HORIZONTAL: baseRow 0-9 (needs row+1 ≤ 10), baseCol 0-8 (needs col+1 for 2 columns)
-    // - VERTICAL: baseCol 0-9 (needs col+1 ≤ 10), baseRow 0-8 (needs row+1 for 2 rows)
+    // Grid: 0-10 (SIZE=11), Internal cells: 1-9, Borders: 0 and 10
+    // Valid click cells (internal): row/col 1-9
     //
-    // Strategy: Use click position - 1 as base, clamped to valid range
+    // Valid base positions:
+    // - HORIZONTAL: baseRow 0-9, baseCol 1-8 (cannot be at col borders 0 or 9)
+    // - VERTICAL: baseCol 0-9, baseRow 1-8 (cannot be at row borders 0 or 9)
+    //
+    // Click-to-base mapping with border protection:
     let baseRow: number;
     let baseCol: number;
 
     if (wallOrientation === "H") {
-      // Horizontal barriers: baseRow can be 0-9, baseCol can be 0-8
-      // Clicking row 1 → baseRow 0 (top border), clicking row 9 → baseRow 9 (bottom border)
-      if (clickRow === INNER_SIZE) {
-        baseRow = INNER_SIZE; // Clicking row 9 → place at row 9 (blocks 9↔10)
-      } else {
-        baseRow = Math.max(0, clickRow - 1);
-      }
-      // baseCol: use click position directly, clamped to valid range 0-8
-      // This allows placing barrier at the clicked column's right edge
-      baseCol = Math.max(0, Math.min(clickCol - 1, SIZE - 3)); // 0 to 8
-      // Special case: clicking col 9 or 8 should both allow placing at baseCol 8
+      // Horizontal: blocks horizontal edges between baseRow and baseRow+1
+      // baseRow can be 0-9 (allows blocking up to border row 10)
+      baseRow = clickRow - 1; // Clicking row X → baseRow X-1
+
+      // baseCol must be 1-8 (cannot be 0 or 9 - borders)
+      // Clicks at col 8 and 9 both should map to baseCol 8
       if (clickCol >= INNER_SIZE - 1) {
+        // Clicking col 8 or 9 → baseCol 8 (rightmost valid)
         baseCol = SIZE - 3; // 8
+      } else {
+        // Clicking col 1-7 → baseCol 1-7 (but clamp minimum to 1)
+        baseCol = Math.max(1, clickCol - 1);
+      }
+
+      // Validate baseCol is not at borders
+      if (baseCol < 1 || baseCol >= SIZE - 2) {
+        if (!silent) toast.error("Não pode colocar barreira na borda");
+        return {
+          ok: false,
+          baseRow: 0,
+          baseCol: 0,
+          orientation: wallOrientation,
+          edgesToAdd: [],
+        };
       }
     } else {
-      // Vertical barriers: baseCol can be 0-9, baseRow can be 0-8
-      // Clicking col 9 → baseCol 9 (right border), clicking col 1 → baseCol 0 (left border)
-      if (clickCol === INNER_SIZE) {
-        baseCol = INNER_SIZE; // Clicking col 9 → place at col 9 (blocks 9↔10)
-      } else {
-        baseCol = Math.max(0, clickCol - 1);
-      }
-      // baseRow: use click position directly, clamped to valid range 0-8
-      baseRow = Math.max(0, Math.min(clickRow - 1, SIZE - 3)); // 0 to 8
-      // Special case: clicking row 9 or 8 should both allow placing at baseRow 8
+      // Vertical: blocks vertical edges between baseCol and baseCol+1
+      // baseCol can be 0-9 (allows blocking up to border col 10)
+      baseCol = clickCol - 1; // Clicking col X → baseCol X-1
+
+      // baseRow must be 1-8 (cannot be 0 or 9 - borders)
+      // Clicks at row 8 and 9 both should map to baseRow 8
       if (clickRow >= INNER_SIZE - 1) {
+        // Clicking row 8 or 9 → baseRow 8 (bottommost valid)
         baseRow = SIZE - 3; // 8
+      } else {
+        // Clicking row 1-7 → baseRow 1-7 (but clamp minimum to 1)
+        baseRow = Math.max(1, clickRow - 1);
+      }
+
+      // Validate baseRow is not at borders
+      if (baseRow < 1 || baseRow >= SIZE - 2) {
+        if (!silent) toast.error("Não pode colocar barreira na borda");
+        return {
+          ok: false,
+          baseRow: 0,
+          baseCol: 0,
+          orientation: wallOrientation,
+          edgesToAdd: [],
+        };
       }
     }
 

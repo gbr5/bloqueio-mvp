@@ -13,6 +13,7 @@
 import { useState, useRef, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { joinRoom } from "@/lib/actions/room-actions";
+import { Loading } from "./Loading";
 
 interface JoinRoomProps {
   onCancel: () => void;
@@ -160,7 +161,7 @@ export function JoinRoom({ onCancel }: JoinRoomProps) {
           >
             {joining ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                <Loading size="md" />
                 <span>Entrando...</span>
               </>
             ) : (

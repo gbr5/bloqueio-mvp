@@ -13,6 +13,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
+import { Loading } from "./Loading";
 import { playTurnSound } from "@/lib/sounds";
 import { getRoomState } from "@/lib/actions/room-actions";
 import {
@@ -21,7 +22,7 @@ import {
   undoLastAction,
 } from "@/lib/actions/game-actions";
 import { getAdaptiveInterval } from "@/config/polling";
-import type { Player, Barrier } from "@prisma/client";
+import type { Barrier } from "@prisma/client";
 import BloqueioPage from "@/app/game";
 import type { GameSnapshot } from "@/types/game";
 import type { RoomWithPlayers } from "@/types/room";
@@ -353,7 +354,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <Loading size="xl" color="border-blue-500" className="mx-auto mb-4" />
           <p className="text-slate-400">Carregando jogo...</p>
         </div>
       </div>
@@ -440,7 +441,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
             className="flex items-center gap-2 px-3 py-2 sm:px-4 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-800 disabled:opacity-50 text-white font-medium rounded-lg transition-colors shadow-lg text-sm"
           >
             {isLoading ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+              <Loading size="sm" />
             ) : (
               <svg
                 className="w-4 h-4"
@@ -465,7 +466,7 @@ export function GameBoard({ roomCode }: GameBoardProps) {
       {isLoading && (
         <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-20 pointer-events-none">
           <div className="bg-slate-800/90 backdrop-blur border border-slate-700 rounded-lg px-6 py-3 flex items-center gap-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent" />
+            <Loading size="md" color="border-blue-500" />
             <span className="text-white text-sm">Processando...</span>
           </div>
         </div>
