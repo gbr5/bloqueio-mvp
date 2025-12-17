@@ -1,0 +1,8 @@
+# Neon Branch Configuration
+# Only create preview branches for specific branches
+
+# Option 1: Use main database for all previews (recommended for free tier)
+use_main_for_previews=true
+
+# Option 2: Only create preview for dev branch
+# preview_branches=dev
