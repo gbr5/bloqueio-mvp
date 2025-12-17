@@ -394,6 +394,10 @@ export default function BloqueioPage({
     col: number;
   } | null>(null);
   const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mobilePreviewRef = useRef<{ row: number; col: number } | null>(null);
+
+  // Keep ref in sync with state
+  mobilePreviewRef.current = mobilePreviewBarrier;
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId)!;
 
@@ -420,21 +424,7 @@ export default function BloqueioPage({
     }
   }, [mode, isMobile]);
 
-  // Inactivity timer - triggers confirmation modal after 5 seconds
-  const triggerMobileConfirmation = useCallback(() => {
-    if (!mobilePreviewBarrier) return;
-
-    // Validate the placement
-    const result = checkWallPlacement(mobilePreviewBarrier.row, mobilePreviewBarrier.col, { silent: false });
-    if (!result.ok) return;
-
-    const { baseRow, baseCol, orientation, edgesToAdd } = result;
-
-    // Set pending barrier and show confirmation modal
-    setPendingBarrier({ baseRow, baseCol, orientation, edgesToAdd });
-    setShowBarrierConfirmation(true);
-  }, [mobilePreviewBarrier, wallOrientation, currentPlayer.wallsLeft, blockedEdges, barriers, players, winner]);
-
+  // Start inactivity timer - triggers confirmation modal after 5 seconds
   const startInactivityTimer = useCallback(() => {
     // Clear existing timeout
     if (inactivityTimeoutRef.current) {
@@ -443,9 +433,21 @@ export default function BloqueioPage({
 
     // Start new 5-second timeout
     inactivityTimeoutRef.current = setTimeout(() => {
-      triggerMobileConfirmation();
+      // Use ref to get current preview position (avoids stale closure)
+      const preview = mobilePreviewRef.current;
+      if (!preview) return;
+
+      // Validate the placement
+      const result = checkWallPlacement(preview.row, preview.col, { silent: false });
+      if (!result.ok) return;
+
+      const { baseRow, baseCol, orientation, edgesToAdd } = result;
+
+      // Set pending barrier and show confirmation modal
+      setPendingBarrier({ baseRow, baseCol, orientation, edgesToAdd });
+      setShowBarrierConfirmation(true);
     }, 5000);
-  }, [triggerMobileConfirmation]);
+  }, []);
 
   // Reset timer whenever preview position changes
   useEffect(() => {
@@ -1161,6 +1163,7 @@ export default function BloqueioPage({
           display: "flex",
           flexDirection: "column",
           gap: "1rem",
+          marginBottom: isMobile ? "6rem" : 0,
         }}
       >
         <header
