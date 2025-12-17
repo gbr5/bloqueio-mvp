@@ -1,0 +1,125 @@
+/**
+ * Bot Engine Orchestrator
+ * Coordinates bot strategy selection and move execution
+ * All bots go through here (Easy, Medium, Hard)
+ */
+
+import { db } from "@/lib/db";
+import type { GameSnapshot, PlayerSnapshot, BarrierSnapshot, BotMove } from "./types";
+import { EasyBot } from "./strategies/easy";
+import { SeededRNG } from "./rng";
+
+export class BotEngine {
+  private rngSeed: string;
+
+  constructor(botSeed: string) {
+    this.rngSeed = botSeed;
+  }
+
+  /**
+   * Execute bot move for a specific player
+   * Creates transaction, executes move, increments turnNumber
+   * Called ONLY from worker.ts (never from client)
+   */
+  async executeBotMove(roomCode: string, playerId: number): Promise<void> {
+    // Load current state
+    const room = await db.room.findUnique({
+      where: { code: roomCode },
+      include: { players: true, barriers: true },
+    });
+
+    if (!room) throw new Error(`Room not found: ${roomCode}`);
+
+    // Build game snapshot
+    const snapshot = this.dbToSnapshot(room);
+
+    // Get bot strategy based on player type
+    const player = room.players.find((p) => p.playerId === playerId);
+    if (!player) throw new Error(`Player ${playerId} not found in room ${roomCode}`);
+
+    const difficulty = player.playerType.replace("BOT_", "");
+    const bot = this.getBotStrategy(difficulty, room.botSeed || this.rngSeed);
+
+    // Bot makes decision (with 5s timeout already enforced by worker)
+    const startTime = Date.now();
+    const decision = await bot.selectMove(snapshot, playerId);
+    const computeTime = Date.now() - startTime;
+
+    // Apply move (via existing game action)
+    // TODO: Call into existing makeMove/placeBarrier functions
+    // For now, this is a placeholder
+    console.log(
+      `🤖 Bot ${playerId} (${difficulty}): ${decision.type} at (${decision.row}, ${decision.col}) [${computeTime}ms]`
+    );
+
+    // Log decision
+    await db.botDecisionLog.create({
+      data: {
+        code: roomCode,
+        playerId,
+        turnNumber: room.turnNumber,
+        difficulty,
+        moveType: decision.type,
+        decision: {
+          row: decision.row,
+          col: decision.col,
+          orientation: decision.orientation,
+        },
+        reasoning: decision.reasoning,
+        computeTimeMs: computeTime,
+        candidatesEvaluated: decision.candidatesEvaluated || 0,
+      },
+    });
+  }
+
+  /**
+   * Get bot strategy instance for difficulty level
+   */
+  private getBotStrategy(difficulty: string, seed: string) {
+    const rng = new SeededRNG(`${seed}:${difficulty}`);
+
+    switch (difficulty.toUpperCase()) {
+      case "EASY":
+        return new EasyBot(rng);
+      // TODO: case "MEDIUM": return new MediumBot(rng);
+      // TODO: case "HARD": return new HardBot(rng);
+      default:
+        throw new Error(`Unknown bot difficulty: ${difficulty}`);
+    }
+  }
+
+  /**
+   * Convert DB state to game snapshot
+   */
+  private dbToSnapshot(room: any): GameSnapshot {
+    const blockedEdges = new Set<string>(room.blockedEdges || []);
+    const players: PlayerSnapshot[] = room.players.map((p: any) => ({
+      playerId: p.playerId,
+      row: p.row,
+      col: p.col,
+      goalSide: p.goalSide,
+      wallsLeft: p.wallsLeft,
+      name: p.name,
+      playerType: p.playerType,
+    }));
+
+    const barriers: BarrierSnapshot[] = (room.barriers || []).map((b: any) => ({
+      id: b.id,
+      row: b.row,
+      col: b.col,
+      orientation: b.orientation,
+      placedBy: b.placedBy,
+    }));
+
+    return {
+      roomCode: room.code,
+      turnNumber: room.turnNumber,
+      currentTurn: room.currentTurn,
+      players,
+      blockedEdges,
+      barriers,
+      winner: room.winner,
+      gameMode: room.gameMode,
+    };
+  }
+}

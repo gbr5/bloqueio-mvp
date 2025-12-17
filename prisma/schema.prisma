@@ -94,9 +94,15 @@ model Room {
   code        String     @unique // 6-character code (R7IAG2)
   status      RoomStatus @default(WAITING)
   gameMode    GameMode   @default(FOUR_PLAYER) // 2P or 4P mode
-  hostId      String? // Session ID of player who created the room
+  hostSessionId String? // Session ID of player who created the room (clear naming)
   currentTurn Int        @default(0) // Current player ID (0-3)
   winner      Int? // Winning player ID
+  
+  // Bot system fields
+  allowBots   Boolean @default(false) // Can this room have bot players?
+  turnNumber  Int     @default(0) // Increments each turn (for idempotency)
+  botSeed     String? // Deterministic RNG seed for bot reproducibility
+  
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -104,6 +110,8 @@ model Room {
   players  Player[]
   barriers Barrier[]
   moves    Move[] // Move history for undo
+  botJobs  BotMoveJob[]
+  botLogs  BotDecisionLog[]
 
   @@index([code])
   @@index([status])
@@ -129,11 +137,14 @@ model Player {
 
   // Identity - can be linked to User account OR use sessionId for guests
   userId    String? // Optional link to Better Auth User (null for guest players)
-  sessionId String // Server-generated session ID from cookies (for all players)
+  sessionId String? // Server-generated session ID (null for bot players)
 
   playerId Int // 0-3 (position in game)
-  name     String // User's name or "Guest Player X"
+  name     String // User's name, "Guest Player X", or "Bot (Easy)"
   color    String // "#ef4444", "#3b82f6", etc.
+  
+  // Bot configuration (NO isBot field - derive from playerType)
+  playerType PlayerType @default(HUMAN) // HUMAN | BOT_EASY | BOT_MEDIUM | BOT_HARD
 
   // Game position - CORRECTED starting positions (first cell AFTER border)
   row       Int // Current row position
@@ -144,11 +155,12 @@ model Player {
   joinedAt   DateTime @default(now())
   lastActive DateTime @updatedAt
 
-  @@unique([roomId, sessionId]) // One player per session per room
+  @@unique([roomId, sessionId]) // One player per session per room (null-safe for bots)
   @@unique([roomId, playerId]) // Each slot 0-3 is unique per room
   @@unique([roomId, userId]) // Each user can only join once per room (if logged in)
   @@index([sessionId])
   @@index([userId])
+  @@index([playerType])
 }
 
 enum GoalSide {
@@ -156,6 +168,25 @@ enum GoalSide {
   RIGHT
   BOTTOM
   LEFT
+}
+
+// ============================================
+// BOT SYSTEM MODELS
+// ============================================
+
+enum PlayerType {
+  HUMAN
+  BOT_EASY
+  BOT_MEDIUM
+  BOT_HARD
+}
+
+enum BotJobStatus {
+  PENDING    // Waiting to be processed
+  RUNNING    // Currently executing
+  COMPLETED  // Successfully completed
+  STALE      // turnNumber mismatch (skip)
+  FAILED     // Error during execution
 }
 
 // Barrier placed on the board
@@ -191,4 +222,45 @@ model Move {
 
   @@index([roomId])
   @@index([createdAt])
+}
+
+// ============================================
+// BOT SYSTEM TABLES
+// ============================================
+
+// Server-driven bot move job queue
+model BotMoveJob {
+  id           String        @id @default(cuid())
+  code         String        // Room code (not roomId for consistency)
+  room         Room          @relation(fields: [code], references: [code], onDelete: Cascade)
+  playerId     Int           // Bot player ID (0-3)
+  expectedTurn Int           // Idempotency: skip if room.turnNumber != this
+  status       BotJobStatus  @default(PENDING)
+  createdAt    DateTime      @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+  error        String?
+
+  @@unique([code, playerId, expectedTurn]) // Prevent duplicate jobs
+  @@index([code, status])
+  @@index([createdAt])
+}
+
+// Separate logging table (prevents Room row bloat)
+model BotDecisionLog {
+  id                  String   @id @default(cuid())
+  code                String   // Room code
+  room                Room     @relation(fields: [code], references: [code], onDelete: Cascade)
+  playerId            Int      // Bot player ID
+  turnNumber          Int      // Which turn this decision was made
+  difficulty          String   // EASY | MEDIUM | HARD
+  moveType            String   // MOVE | WALL
+  decision            Json     // Move details or wall placement
+  reasoning           Json?    // For Hard bot: minimax scores, pruning stats
+  computeTimeMs       Int      // Time spent computing (for profiling)
+  candidatesEvaluated Int      // How many moves/walls evaluated
+  createdAt           DateTime @default(now())
+
+  @@index([code, createdAt])
+  @@index([difficulty, createdAt])
 }
