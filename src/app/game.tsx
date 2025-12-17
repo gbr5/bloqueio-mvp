@@ -18,8 +18,9 @@ import type {
   Orientation,
   Barrier,
   GameSnapshot,
+  GameMode,
 } from "@/types/game";
-import { PLAYER_BASE_COLORS } from "@/types/game";
+import { PLAYER_BASE_COLORS, getGameModeConfig } from "@/types/game";
 
 /**
  * Props for controlled BloqueioPage component
@@ -32,6 +33,7 @@ interface BloqueioPageProps {
   onGameStateChange?: (newState: GameSnapshot) => void;
   myPlayerId?: number | null;
   disabled?: boolean;
+  gameMode?: GameMode; // NEW: Game mode (2P or 4P)
 }
 
 // Tabuleiro original interno é 9x9, com uma borda extra em volta
@@ -64,50 +66,55 @@ function isGoal(row: number, col: number, goalSide: GoalSide) {
   }
 }
 
-function createInitialPlayers(): Player[] {
+function createInitialPlayers(gameMode: GameMode = "FOUR_PLAYER"): Player[] {
   const mid = Math.floor(SIZE / 2); // centro do 11x11
-  return [
+  const config = getGameModeConfig(gameMode);
+
+  const allPlayers = [
     {
-      id: 0,
+      id: 0 as PlayerId,
       row: 1, // segunda linha a partir do topo
       col: mid,
-      goalSide: "BOTTOM",
-      wallsLeft: 6,
+      goalSide: "BOTTOM" as GoalSide,
+      wallsLeft: config.wallsPerPlayer,
       color: "#ef4444",
       name: "Jogador 1",
       label: "Vermelho",
     },
     {
-      id: 1,
+      id: 1 as PlayerId,
       row: mid,
       col: SIZE - 2, // segunda coluna a partir da direita
-      goalSide: "LEFT",
-      wallsLeft: 6,
+      goalSide: "LEFT" as GoalSide,
+      wallsLeft: config.wallsPerPlayer,
       color: "#3b82f6",
       name: "Jogador 2",
       label: "Azul",
     },
     {
-      id: 2,
+      id: 2 as PlayerId,
       row: SIZE - 2, // segunda linha a partir de baixo
       col: mid,
-      goalSide: "TOP",
-      wallsLeft: 6,
+      goalSide: "TOP" as GoalSide,
+      wallsLeft: config.wallsPerPlayer,
       color: "#22c55e",
       name: "Jogador 3",
       label: "Verde",
     },
     {
-      id: 3,
+      id: 3 as PlayerId,
       row: mid,
       col: 1, // segunda coluna a partir da esquerda
-      goalSide: "RIGHT",
-      wallsLeft: 6,
+      goalSide: "RIGHT" as GoalSide,
+      wallsLeft: config.wallsPerPlayer,
       color: "#f59e0b",
       name: "Jogador 4",
       label: "Amarelo",
     },
   ];
+
+  // Return only players needed for this mode
+  return config.playerSlots.map((slotId) => allPlayers[slotId]);
 }
 
 // BFS para checar se ainda existe algum caminho até o objetivo
@@ -345,10 +352,11 @@ export default function BloqueioPage({
   onGameStateChange,
   myPlayerId,
   disabled = false,
+  gameMode = "FOUR_PLAYER", // Default to 4-player mode
 }: BloqueioPageProps = {}) {
   // Internal state for local-only play (when no props provided)
   const [localPlayers, setLocalPlayers] = useState<Player[]>(() =>
-    createInitialPlayers()
+    createInitialPlayers(gameMode)
   );
   const [localBlockedEdges, setLocalBlockedEdges] = useState<Set<string>>(
     () => new Set()
@@ -371,6 +379,13 @@ export default function BloqueioPage({
     ? externalGameState.currentPlayerId
     : localCurrentPlayerId;
   const winner = isControlled ? externalGameState.winner : localWinner;
+
+  // Derive game mode from player count or use prop
+  const activeGameMode: GameMode =
+    externalGameState?.gameMode ||
+    gameMode ||
+    (players.length === 2 ? "TWO_PLAYER" : "FOUR_PLAYER");
+  const modeConfig = getGameModeConfig(activeGameMode);
 
   // UI-only state (not synced)
   const [mode, setMode] = useState<Mode>("move");
@@ -401,9 +416,19 @@ export default function BloqueioPage({
   mobilePreviewRef.current = mobilePreviewBarrier;
   wallOrientationRef.current = wallOrientation;
 
-  const currentPlayer = players.find((p) => p.id === currentPlayerId)!;
+  const currentPlayer = players.find((p) => p.id === currentPlayerId);
 
-  // Mobile detection effect
+  // Safety check: if currentPlayer is undefined, reset to first player
+  useEffect(() => {
+    if (!currentPlayer && players.length > 0) {
+      console.error(
+        `[BloqueioPage] currentPlayerId ${currentPlayerId} not found in players:`,
+        players.map((p) => ({ id: p.id, name: p.name }))
+      );
+      // Reset to first player
+      updateGameState({ currentPlayerId: players[0].id });
+    }
+  }, [currentPlayerId, players, currentPlayer]);
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 640);
     checkMobile();
@@ -472,10 +497,14 @@ export default function BloqueioPage({
       const edgesToAdd: string[] = [];
       if (orientation === "H") {
         edgesToAdd.push(edgeKey(baseRow, baseCol, baseRow + 1, baseCol));
-        edgesToAdd.push(edgeKey(baseRow, baseCol + 1, baseRow + 1, baseCol + 1));
+        edgesToAdd.push(
+          edgeKey(baseRow, baseCol + 1, baseRow + 1, baseCol + 1)
+        );
       } else {
         edgesToAdd.push(edgeKey(baseRow, baseCol, baseRow, baseCol + 1));
-        edgesToAdd.push(edgeKey(baseRow + 1, baseCol, baseRow + 1, baseCol + 1));
+        edgesToAdd.push(
+          edgeKey(baseRow + 1, baseCol, baseRow + 1, baseCol + 1)
+        );
       }
 
       // Set pending barrier and show confirmation modal
@@ -523,7 +552,13 @@ export default function BloqueioPage({
   }
 
   function nextPlayerId(id: PlayerId): PlayerId {
-    return ((id + 1) % 4) as PlayerId;
+    // Find current player index in the players array
+    const currentIndex = players.findIndex((p) => p.id === id);
+    if (currentIndex === -1) return players[0].id; // Fallback to first player
+
+    // Get next player in circular fashion
+    const nextIndex = (currentIndex + 1) % players.length;
+    return players[nextIndex].id;
   }
 
   function cellOccupied(row: number, col: number): Player | undefined {
@@ -567,6 +602,7 @@ export default function BloqueioPage({
   function canMoveTo(row: number, col: number): boolean {
     if (winner !== null) return false;
     const cur = currentPlayer;
+    if (!cur) return false; // Safety check
     return canPawnMoveTo(cur, row, col, blockedEdges, players);
   }
 
@@ -595,7 +631,7 @@ export default function BloqueioPage({
       };
     }
 
-    if (currentPlayer.wallsLeft <= 0) {
+    if (currentPlayer && currentPlayer.wallsLeft <= 0) {
       if (!silent) toast.error("Sem barreiras restantes!");
       return {
         ok: false,
@@ -761,7 +797,9 @@ export default function BloqueioPage({
       );
       if (!silent)
         toast.error(
-          `Esta barreira bloquearia ${blockedPlayers[0]?.name ?? "um jogador"} de alcançar seu objetivo`
+          `Esta barreira bloquearia ${
+            blockedPlayers[0]?.name ?? "um jogador"
+          } de alcançar seu objetivo`
         );
       return {
         ok: false,
@@ -807,7 +845,7 @@ export default function BloqueioPage({
 
   function handleMove(row: number, col: number) {
     if (!canMoveTo(row, col)) return;
-
+    if (!currentPlayer) return; // Safety check
     const cur = currentPlayer;
     pushSnapshot();
 
@@ -839,6 +877,7 @@ export default function BloqueioPage({
 
   function confirmBarrierPlacement() {
     if (!pendingBarrier) return;
+    if (!currentPlayer) return; // Safety check
 
     const { baseRow, baseCol, orientation, edgesToAdd } = pendingBarrier;
 
@@ -894,7 +933,7 @@ export default function BloqueioPage({
       return;
     }
 
-    setLocalPlayers(createInitialPlayers());
+    setLocalPlayers(createInitialPlayers(gameMode));
     setLocalBlockedEdges(new Set());
     setLocalBarriers([]);
     setLocalCurrentPlayerId(0);
@@ -949,7 +988,10 @@ export default function BloqueioPage({
         // Wall mode
         if (isMobile && mobilePreviewBarrier) {
           // Mobile: highlight the preview position
-          if (row === mobilePreviewBarrier.row && col === mobilePreviewBarrier.col) {
+          if (
+            row === mobilePreviewBarrier.row &&
+            col === mobilePreviewBarrier.col
+          ) {
             isMobilePreviewCell = true;
             const result = checkWallPlacement(row, col, { silent: true });
             if (result.ok) {
@@ -1009,7 +1051,9 @@ export default function BloqueioPage({
               ? "0 0 0 2px #ef4444 inset" // Red for invalid mobile preview
               : isAllowedHover
               ? `0 0 0 2px ${
-                  mode === "move" ? currentPlayer.color : "#facc15"
+                  mode === "move"
+                    ? currentPlayer?.color ?? "#ffffff"
+                    : "#facc15"
                 } inset`
               : "none",
             transition: "box-shadow 0.08s ease-out, background 0.08s ease-out",
@@ -1060,7 +1104,7 @@ export default function BloqueioPage({
     if (pending) {
       barrierColor = "#f59e0b"; // Amber color for pending confirmation
     } else if (ghost) {
-      barrierColor = currentPlayer.color;
+      barrierColor = currentPlayer?.color ?? "#ffffff";
     } else if (b.placedBy !== undefined) {
       const placer = players.find((p) => p.id === b.placedBy);
       barrierColor = placer?.color ?? "#facc15";
@@ -1073,7 +1117,9 @@ export default function BloqueioPage({
     const opacity = pending ? "99" : "66";
     const ghostColor = barrierColor.startsWith("#")
       ? `${barrierColor}${opacity}`
-      : barrierColor.replace(")", `, ${pending ? 0.6 : 0.4})`).replace("rgb", "rgba");
+      : barrierColor
+          .replace(")", `, ${pending ? 0.6 : 0.4})`)
+          .replace("rgb", "rgba");
 
     if (b.orientation === "H") {
       const top = (b.row + 1) * cellPercent;
@@ -1141,9 +1187,13 @@ export default function BloqueioPage({
     ghostBarrier = renderBarrier(pending, { ghost: true, pending: true });
   } else if (isMobile && mode === "wall" && mobilePreviewBarrier) {
     // Mobile preview mode: show barrier at preview position
-    const res = checkWallPlacement(mobilePreviewBarrier.row, mobilePreviewBarrier.col, {
-      silent: true,
-    });
+    const res = checkWallPlacement(
+      mobilePreviewBarrier.row,
+      mobilePreviewBarrier.col,
+      {
+        silent: true,
+      }
+    );
     if (res.ok) {
       const ghost: Barrier = {
         row: res.baseRow,
@@ -1175,7 +1225,7 @@ export default function BloqueioPage({
       return `${p.name} venceu!`;
     }
 
-    let baseText = `Vez de ${currentPlayer.name} (${
+    let baseText = `Vez de ${currentPlayer?.name} (${
       mode === "move" ? "mover peão" : "colocar barreira"
     })`;
 
@@ -1241,7 +1291,7 @@ export default function BloqueioPage({
               fontSize: "clamp(0.8rem, 3vw, 0.95rem)",
               padding: "0.3rem 0.8rem",
               borderRadius: 999,
-              background: currentPlayer.color,
+              background: currentPlayer?.color ?? "#ffffff",
               border: "1px solid #1f2937",
               textAlign: "center",
             }}
@@ -1356,7 +1406,7 @@ export default function BloqueioPage({
                 >
                   Mover peão
                 </button>
-                {currentPlayer.wallsLeft > 0 && (
+                {currentPlayer && currentPlayer.wallsLeft > 0 && (
                   <button
                     type="button"
                     onClick={() => setMode("wall")}
@@ -1377,7 +1427,8 @@ export default function BloqueioPage({
                       cursor: "pointer",
                     }}
                   >
-                    Colocar barreira ({currentPlayer.wallsLeft})
+                    Colocar barreira ({currentPlayer.wallsLeft}/
+                    {modeConfig.wallsPerPlayer})
                   </button>
                 )}
                 {!isControlled && (
@@ -1535,10 +1586,10 @@ export default function BloqueioPage({
                             : 500,
                       }}
                     >
-                      {p.name}
+                      {p?.name}
                     </span>
                     <span style={{ color: "#9ca3af", marginLeft: "auto" }}>
-                      Barreiras: {p.wallsLeft}
+                      Barreiras: {p.wallsLeft}/{modeConfig.wallsPerPlayer}
                     </span>
                   </li>
                 ))}
@@ -1589,9 +1640,9 @@ export default function BloqueioPage({
           />
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: "0.9rem", color: "#e5e7eb" }}>
-              Você tem <strong>{currentPlayer.wallsLeft}</strong> barreira
-              {currentPlayer.wallsLeft !== 1 ? "s" : ""} restante
-              {currentPlayer.wallsLeft !== 1 ? "s" : ""}.
+              Você tem <strong>{currentPlayer?.wallsLeft ?? 0}</strong> barreira
+              {(currentPlayer?.wallsLeft ?? 0) !== 1 ? "s" : ""} restante
+              {(currentPlayer?.wallsLeft ?? 0) !== 1 ? "s" : ""}.
             </p>
             <p style={{ fontSize: "0.8rem", color: "#9ca3af", marginTop: 4 }}>
               A barreira está destacada em âmbar no tabuleiro.

@@ -3,6 +3,21 @@
 import { db } from "@/lib/db";
 import { getOrCreateSessionId } from "@/lib/session";
 import type { GoalSide, Prisma } from "@prisma/client";
+import { getGameModeConfig, type GameMode } from "@/types/game";
+
+/**
+ * Get next player ID - works for both 2P and 4P modes
+ * Cycles through actual player IDs, not array indices
+ */
+function getNextPlayerId(
+  currentPlayerId: number,
+  players: Array<{ playerId: number }>
+): number {
+  const currentIndex = players.findIndex((p) => p.playerId === currentPlayerId);
+  if (currentIndex === -1) return players[0].playerId;
+  const nextIndex = (currentIndex + 1) % players.length;
+  return players[nextIndex].playerId;
+}
 
 /**
  * Check if a player has reached their goal
@@ -87,7 +102,7 @@ export async function makeMove(
         data: {
           currentTurn: isWin
             ? room.currentTurn
-            : (room.currentTurn + 1) % room.players.length,
+            : getNextPlayerId(room.currentTurn, room.players),
           winner: isWin ? player.playerId : room.winner,
           status: isWin ? "FINISHED" : room.status,
         },
@@ -105,7 +120,9 @@ export async function makeMove(
               where: { id: p.userId },
               data: {
                 gamesPlayed: { increment: 1 },
-                ...(p.playerId === player.playerId && { gamesWon: { increment: 1 } }),
+                ...(p.playerId === player.playerId && {
+                  gamesWon: { increment: 1 },
+                }),
               },
             })
           );
@@ -350,7 +367,7 @@ export async function placeBarrier(
       db.room.update({
         where: { id: room.id },
         data: {
-          currentTurn: (room.currentTurn + 1) % room.players.length,
+          currentTurn: getNextPlayerId(room.currentTurn, room.players),
         },
       }),
     ]);
@@ -497,9 +514,28 @@ export async function startGame(
     if (room.hostId !== sessionId) {
       return { error: "Only host can start the game" };
     }
-    if (room.players.length < 2) {
-      return { error: "Need at least 2 players to start" };
+
+    const config = getGameModeConfig(room.gameMode as GameMode);
+
+    // Validate player count based on game mode
+    if (room.players.length < config.minPlayers) {
+      return {
+        error:
+          room.gameMode === "TWO_PLAYER"
+            ? "Precisa de exatamente 2 jogadores para começar"
+            : "Precisa de pelo menos 2 jogadores para começar",
+      };
     }
+
+    if (room.players.length > config.maxPlayers) {
+      return { error: `Muitos jogadores para o modo ${config.label}` };
+    }
+
+    // Additional validation for 2P mode: must have exactly 2 players
+    if (room.gameMode === "TWO_PLAYER" && room.players.length !== 2) {
+      return { error: "Modo 2 jogadores requer exatamente 2 jogadores" };
+    }
+
     if (room.status !== "WAITING") {
       return { error: "Game already started" };
     }

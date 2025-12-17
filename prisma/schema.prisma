@@ -93,6 +93,7 @@ model Room {
   id          String     @id @default(cuid())
   code        String     @unique // 6-character code (R7IAG2)
   status      RoomStatus @default(WAITING)
+  gameMode    GameMode   @default(FOUR_PLAYER) // 2P or 4P mode
   hostId      String? // Session ID of player who created the room
   currentTurn Int        @default(0) // Current player ID (0-3)
   winner      Int? // Winning player ID
@@ -106,12 +107,18 @@ model Room {
 
   @@index([code])
   @@index([status])
+  @@index([gameMode])
 }
 
 enum RoomStatus {
   WAITING // Lobby - players joining
   PLAYING // Game in progress
   FINISHED // Game over
+}
+
+enum GameMode {
+  TWO_PLAYER // 2 players, 12 barriers each
+  FOUR_PLAYER // 4 players, 6 barriers each
 }
 
 // Player in a specific room

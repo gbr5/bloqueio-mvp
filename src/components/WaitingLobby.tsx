@@ -1,3 +1,4 @@
+// src/components/WaitingLobby.tsx
 /**
  * WaitingLobby Component
  *
@@ -15,15 +16,12 @@ import { getRoomState } from "@/lib/actions/room-actions";
 import { startGame } from "@/lib/actions/game-actions";
 import { POLLING_INTERVALS } from "@/config/polling";
 import { AuthOrGuestModal } from "./AuthOrGuestModal";
-import type { Room, Player } from "@prisma/client";
+import { getGameModeConfig, type GameMode } from "@/types/game";
+import type { RoomWithPlayers } from "@/types/room";
 
 interface WaitingLobbyProps {
   roomCode: string;
 }
-
-type RoomWithPlayers = Room & {
-  players: Player[];
-};
 
 export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
   const router = useRouter();
@@ -34,26 +32,26 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [guestName, setGuestName] = useState<string | null>(null);
+  const [guestName, setGuestName] = useState<string | null>(() => {
+    // Initialize from localStorage on mount
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("guest_name");
+    }
+    return null;
+  });
 
   // Check if user has identity (auth or guest name)
   const user = session?.user;
   const hasIdentity = !!user || !!guestName;
 
-  // Load guest name from localStorage on mount
+  // Show auth modal if user has no identity
   useEffect(() => {
-    const storedName = localStorage.getItem("guest_name");
-    if (storedName) {
-      setGuestName(storedName);
+    if (!sessionPending && !hasIdentity) {
+      // Use timeout to avoid synchronous setState in effect
+      const timer = setTimeout(() => setShowAuthModal(true), 0);
+      return () => clearTimeout(timer);
     }
-  }, []);
-
-  // Show auth modal if user has no identity (after session check completes)
-  useEffect(() => {
-    if (!sessionPending && !hasIdentity && !showAuthModal) {
-      setShowAuthModal(true);
-    }
-  }, [sessionPending, hasIdentity, showAuthModal]);
+  }, [sessionPending, hasIdentity]);
 
   // Poll for room updates
   useEffect(() => {
@@ -144,7 +142,14 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
 
   const isHost = myPlayerId === 0;
   const playerCount = room.players.length;
-  const canStart = isHost && playerCount >= 2 && playerCount <= 4;
+  const config = getGameModeConfig(
+    (room.gameMode as GameMode) || "FOUR_PLAYER"
+  );
+  const canStart =
+    isHost &&
+    playerCount >= config.minPlayers &&
+    playerCount <= config.maxPlayers &&
+    (room.gameMode === "FOUR_PLAYER" || playerCount === 2); // 2P mode requires exactly 2
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-radial from-slate-950 to-black p-4">
@@ -152,6 +157,17 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-4">Sala de Espera</h1>
+
+          {/* Game Mode Badge */}
+          <div className="inline-flex items-center gap-2 bg-blue-900/30 border border-blue-500/50 rounded-lg px-4 py-2 mb-4">
+            <span className="text-2xl">
+              {room.gameMode === "TWO_PLAYER" ? "🎯" : "🎲"}
+            </span>
+            <span className="text-sm font-semibold text-blue-300">
+              {config.label} • {config.wallsPerPlayer} barreiras cada
+            </span>
+          </div>
+
           <div className="flex items-center justify-center gap-4">
             <div className="bg-slate-800 border border-slate-600 rounded-lg px-6 py-3">
               <p className="text-sm text-slate-400 mb-1">Código da Sala</p>
@@ -172,10 +188,14 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
         <div className="bg-slate-800/90 border border-slate-700 rounded-xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-white">
-              Jogadores ({playerCount}/4)
+              Jogadores ({playerCount}/{config.maxPlayers})
             </h2>
-            {playerCount < 2 && (
-              <p className="text-sm text-yellow-400">Mínimo de 2 jogadores</p>
+            {playerCount < config.minPlayers && (
+              <p className="text-sm text-yellow-400">
+                {room.gameMode === "TWO_PLAYER"
+                  ? "Aguardando 1 jogador"
+                  : "Mínimo de 2 jogadores"}
+              </p>
             )}
           </div>
 
@@ -210,8 +230,8 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
               </div>
             ))}
 
-            {/* Empty slots */}
-            {[...Array(4 - playerCount)].map((_, i) => (
+            {/* Empty slots - show only for available positions */}
+            {[...Array(config.maxPlayers - playerCount)].map((_, i) => (
               <div
                 key={`empty-${i}`}
                 className="flex items-center gap-4 p-4 border-2 border-dashed border-slate-700 rounded-lg opacity-50"

@@ -1,3 +1,4 @@
+// src/components/GameBoard.tsx
 /**
  * GameBoard Component - Multiplayer Game Interface
  *
@@ -14,20 +15,20 @@ import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 import { playTurnSound } from "@/lib/sounds";
 import { getRoomState } from "@/lib/actions/room-actions";
-import { makeMove, placeBarrier, undoLastAction } from "@/lib/actions/game-actions";
+import {
+  makeMove,
+  placeBarrier,
+  undoLastAction,
+} from "@/lib/actions/game-actions";
 import { getAdaptiveInterval } from "@/config/polling";
-import type { Player, Barrier, Room } from "@prisma/client";
+import type { Player, Barrier } from "@prisma/client";
 import BloqueioPage from "@/app/game";
 import type { GameSnapshot } from "@/types/game";
+import type { RoomWithPlayers } from "@/types/room";
 
 interface GameBoardProps {
   roomCode: string;
 }
-
-type RoomWithPlayers = Room & {
-  players: Player[];
-  barriers: Barrier[];
-};
 
 export function GameBoard({ roomCode }: GameBoardProps) {
   const router = useRouter();
@@ -52,6 +53,21 @@ export function GameBoard({ roomCode }: GameBoardProps) {
 
       setRoom(result.room);
       setMyPlayerId(result.myPlayerId);
+
+      // Validate that current player exists in players array
+      const currentPlayer = result.room.players.find(
+        (p) => p.playerId === result.room.currentTurn
+      );
+
+      if (!currentPlayer && result.room.players.length > 0) {
+        console.error(
+          `[GameBoard] Current turn ${result.room.currentTurn} not found in players`,
+          result.room.players.map((p) => ({ id: p.playerId, name: p.name }))
+        );
+        toast.error("Erro no estado do jogo. Retornando ao início...");
+        setTimeout(() => router.push("/"), 2000);
+        return;
+      }
 
       // Check if player can undo (they just moved and it's now opponent's turn)
       const previousPlayerId =
@@ -387,7 +403,8 @@ export function GameBoard({ roomCode }: GameBoardProps) {
                   />
                 )}
                 <span className="text-white text-xs font-medium">
-                  {currentTurnPlayer?.name ?? `Jogador ${gameState.currentPlayerId + 1}`}
+                  {currentTurnPlayer?.name ??
+                    `Jogador ${gameState.currentPlayerId + 1}`}
                 </span>
               </div>
             </div>
@@ -404,7 +421,10 @@ export function GameBoard({ roomCode }: GameBoardProps) {
           {gameState.winner !== null && (
             <div className="border-t border-slate-600 pt-2 mt-2">
               <p className="text-yellow-400 font-bold text-center">
-                🏆 {gameState.players.find((p) => p.id === gameState.winner)?.name ?? `Jogador ${gameState.winner + 1}`} venceu!
+                🏆{" "}
+                {gameState.players.find((p) => p.id === gameState.winner)
+                  ?.name ?? `Jogador ${gameState.winner + 1}`}{" "}
+                venceu!
               </p>
             </div>
           )}
@@ -472,7 +492,10 @@ export function GameBoard({ roomCode }: GameBoardProps) {
                 <p className="text-xl sm:text-2xl text-white">
                   {myPlayerId === gameState.winner
                     ? "Você Venceu!"
-                    : `${gameState.players.find((p) => p.id === gameState.winner)?.name ?? `Jogador ${gameState.winner + 1}`} Venceu!`}
+                    : `${
+                        gameState.players.find((p) => p.id === gameState.winner)
+                          ?.name ?? `Jogador ${gameState.winner + 1}`
+                      } Venceu!`}
                 </p>
               </div>
 
