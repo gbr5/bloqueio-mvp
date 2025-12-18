@@ -19,10 +19,10 @@ import { processPendingBotJobs } from "@/lib/bot/worker";
 export async function GET(request: Request) {
   try {
     // Optional: Add authorization check in production
-    // const authHeader = request.headers.get("authorization");
-    // if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    // }
+    const authHeader = request.headers.get("authorization");
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     console.log("[Bot Worker] Processing bot jobs...");
     const result = await processPendingBotJobs();

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Bot Engine Orchestrator
  * Coordinates bot strategy selection and move execution
@@ -5,8 +6,10 @@
  */
 
 import { db } from "@/lib/db";
-import type { GameSnapshot, PlayerSnapshot, BarrierSnapshot } from "./types";
+import type { GameSnapshot, PlayerSnapshot } from "./types";
 import { EasyBot } from "./strategies/easy";
+import { MediumBot } from "./strategies/medium";
+import { HardBot } from "./strategies/hard";
 import { SeededRNG } from "./rng";
 import { afterMoveCommit } from "./scheduler";
 
@@ -65,7 +68,7 @@ export class BotEngine {
         player.id,
         decision.row,
         decision.col,
-        decision.orientation!
+        decision.orientation as "HORIZONTAL" | "VERTICAL"
       );
     }
 
@@ -82,7 +85,7 @@ export class BotEngine {
           col: decision.col,
           orientation: decision.orientation,
         },
-        reasoning: decision.reasoning,
+        reasoning: decision.reasoning as string,
         computeTimeMs: computeTime,
         candidatesEvaluated: decision.candidatesEvaluated || 0,
       },
@@ -243,10 +246,13 @@ export class BotEngine {
     switch (difficulty.toUpperCase()) {
       case "EASY":
         return new EasyBot(rng);
-      // TODO: case "MEDIUM": return new MediumBot(rng);
-      // TODO: case "HARD": return new HardBot(rng);
+      case "MEDIUM":
+        return new MediumBot(rng);
+      case "HARD":
+        return new HardBot(rng);
       default:
-        throw new Error(`Unknown bot difficulty: ${difficulty}`);
+        console.warn(`Unknown difficulty: ${difficulty}, defaulting to EASY`);
+        return new EasyBot(rng);
     }
   }
 

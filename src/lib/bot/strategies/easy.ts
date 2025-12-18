@@ -4,8 +4,8 @@
  * Uses seeded RNG for determinism
  */
 
-import type { GameSnapshot, BotMove } from "../types";
-import { findShortestPath, distanceToGoal } from "../pathfinding";
+import type { GameSnapshot } from "../types";
+import { findShortestPath } from "../pathfinding";
 import { SeededRNG } from "../rng";
 
 export class EasyBot {

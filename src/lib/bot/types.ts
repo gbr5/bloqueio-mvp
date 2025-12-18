@@ -26,7 +26,7 @@ export interface PlayerSnapshot {
   playerId: number; // 0-3
   row: number;
   col: number;
-  goalSide: GoalSide;
+  goalSide: GoalSide; // Allow string for DB compatibility
   wallsLeft: number;
   name: string;
   playerType: PlayerType;
