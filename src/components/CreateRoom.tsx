@@ -70,8 +70,27 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
           `room_${result.code}_playerId`,
           String(result.playerId)
         );
-        // Auto-redirect to lobby
-        router.push(`/room/${result.code}/lobby`);
+
+        // Check if all non-host players are bots
+        const nonHostSlots = playerSlots.slice(1, maxPlayers);
+        const allBotsOrEmpty = nonHostSlots.every(
+          (slot) =>
+            slot === "BOT_EASY" ||
+            slot === "BOT_MEDIUM" ||
+            slot === "BOT_HARD" ||
+            slot === "EMPTY"
+        );
+        const hasAtLeastOneFilled = nonHostSlots.some(
+          (slot) => slot !== "EMPTY"
+        );
+
+        // If playing only against bots, skip lobby and go straight to game
+        if (allowBots && allBotsOrEmpty && hasAtLeastOneFilled) {
+          router.push(`/room/${result.code}/game`);
+        } else {
+          // Otherwise, go to lobby to wait for human players
+          router.push(`/room/${result.code}/lobby`);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create room");
@@ -262,12 +281,8 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
                           <option value="EMPTY">Empty Slot</option>
                           <option value="HUMAN">Human</option>
                           <option value="BOT_EASY">Bot - Easy</option>
-                          <option value="BOT_MEDIUM" disabled>
-                            Bot - Medium (Soon)
-                          </option>
-                          <option value="BOT_HARD" disabled>
-                            Bot - Hard (Soon)
-                          </option>
+                          <option value="BOT_MEDIUM">Bot - Medium</option>
+                          <option value="BOT_HARD">Bot - Hard</option>
                         </select>
                       )}
                     </div>
