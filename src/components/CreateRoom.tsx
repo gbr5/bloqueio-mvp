@@ -34,9 +34,9 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
   const [allowBots, setAllowBots] = useState(false);
   const [playerSlots, setPlayerSlots] = useState<PlayerSlotType[]>([
     "HUMAN",
-    "EMPTY",
-    "EMPTY",
-    "EMPTY",
+    "HUMAN",
+    "HUMAN",
+    "HUMAN",
   ]);
 
   const handleCreateRoom = async () => {
@@ -47,16 +47,7 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
       const config = getGameModeConfig(selectedMode);
       const maxPlayers = config.maxPlayers;
 
-      // Validate player count
-      const filledSlots = playerSlots
-        .slice(0, maxPlayers)
-        .filter((s) => s !== "EMPTY");
-      if (filledSlots.length < config.minPlayers) {
-        setError(`Need at least ${config.minPlayers} players to start`);
-        setLoading(false);
-        return;
-      }
-
+      // Only pass slot configuration if bots are enabled
       const result = await createRoom(
         selectedMode,
         allowBots ? playerSlots.slice(0, maxPlayers) : undefined
@@ -71,26 +62,25 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
           String(result.playerId)
         );
 
-        // Check if all non-host players are bots
-        const nonHostSlots = playerSlots.slice(1, maxPlayers);
-        const allBotsOrEmpty = nonHostSlots.every(
-          (slot) =>
-            slot === "BOT_EASY" ||
-            slot === "BOT_MEDIUM" ||
-            slot === "BOT_HARD" ||
-            slot === "EMPTY"
-        );
-        const hasAtLeastOneFilled = nonHostSlots.some(
-          (slot) => slot !== "EMPTY"
-        );
+        // Check if all non-host players are bots (skip lobby for bot-only games)
+        if (allowBots) {
+          const nonHostSlots = playerSlots.slice(1, maxPlayers);
+          const allBots = nonHostSlots.every(
+            (slot) =>
+              slot === "BOT_EASY" ||
+              slot === "BOT_MEDIUM" ||
+              slot === "BOT_HARD"
+          );
 
-        // If playing only against bots, skip lobby and go straight to game
-        if (allowBots && allBotsOrEmpty && hasAtLeastOneFilled) {
-          router.push(`/room/${result.code}/game`);
-        } else {
-          // Otherwise, go to lobby to wait for human players
-          router.push(`/room/${result.code}/lobby`);
+          // If playing only against bots, skip lobby and go straight to game
+          if (allBots) {
+            router.push(`/room/${result.code}/game`);
+            return;
+          }
         }
+
+        // Otherwise, go to lobby (for human players to join)
+        router.push(`/room/${result.code}/lobby`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create room");
@@ -216,7 +206,7 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
                   setAllowBots(!allowBots);
                   if (!allowBots) {
                     // Reset slots when enabling bots
-                    setPlayerSlots(["HUMAN", "EMPTY", "EMPTY", "EMPTY"]);
+                    setPlayerSlots(["HUMAN", "HUMAN", "HUMAN", "HUMAN"]);
                   }
                 }}
                 disabled={loading}
@@ -278,7 +268,6 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
                           disabled={loading}
                           className="px-3 py-1.5 bg-slate-700 text-white text-sm rounded border border-slate-600 focus:border-blue-500 focus:outline-none"
                         >
-                          <option value="EMPTY">Empty Slot</option>
                           <option value="HUMAN">Human</option>
                           <option value="BOT_EASY">Bot - Easy</option>
                           <option value="BOT_MEDIUM">Bot - Medium</option>
