@@ -67,13 +67,15 @@
 **Medium & Hard Bot Strategies implemented** - All 3 difficulty levels working:
 
 ### Medium Bot Strategy
+
 - **Algorithm:** Weighted move selection with defensive barriers
 - **Move Selection:** Sorts moves by distance improvement, selects from top 3
 - **Barrier Placement:** 30% chance, targets opponent shortest paths
 - **Scoring:** `improvement + random_noise` for variety
 - **File:** `src/lib/bot/strategies/medium.ts` (348 lines)
 
-### Hard Bot Strategy  
+### Hard Bot Strategy
+
 - **Algorithm:** 2-move lookahead with strategic barriers
 - **Move Selection:** Evaluates advantage (my distance vs opponent distance)
 - **Barrier Placement:** 40% chance, maximizes opponent delay
@@ -82,6 +84,7 @@
 - **File:** `src/lib/bot/strategies/hard.ts` (478 lines)
 
 ### Type Fixes
+
 - Updated `PlayerSnapshot.goalSide` to accept `GoalSide | string` for DB compatibility
 - Added GoalSide type assertions across all bot strategies
 - Fixed engine.ts syntax errors and duplicate closing braces
@@ -121,6 +124,7 @@
 **1. Medium & Hard Bot Strategies**  
 **Status:** ✅ COMPLETE (Dec 18, 2024)  
 **Implementation:**
+
 - ✅ `src/lib/bot/strategies/medium.ts` (348 lines) - Weighted selection, 30% barriers
 - ✅ `src/lib/bot/strategies/hard.ts` (478 lines) - 2-move lookahead, 40% barriers
 - ✅ BotEngine updated to instantiate Medium and Hard strategies
@@ -191,15 +195,15 @@
 
 ## 📊 Overall Progress
 
-| Phase                   | Status      | Time Spent | Completion |
-| ----------------------- | ----------- | ---------- | ---------- |
-| Phase 0: Foundation     | ✅ Complete | 8 hours    | 100%       |
-| Phase 1: Integration    | ✅ Complete | 6 hours    | 100%       |
-| Phase 2: UI + Fixes     | ✅ Complete | 4 hours    | 100%       |
-| Phase 2.5: Med/Hard AI  | ✅ Complete | 6 hours    | 100%       |
-| Phase 3: Testing        | ⏳ Pending  | 0 hours    | 30%        |
-| Phase 4: Mid-game Bots  | ⏳ Pending  | 0 hours    | 0%         |
-| Phase 5: Monitoring     | ⏳ Pending  | 0 hours    | 0%         |
+| Phase                  | Status      | Time Spent | Completion |
+| ---------------------- | ----------- | ---------- | ---------- |
+| Phase 0: Foundation    | ✅ Complete | 8 hours    | 100%       |
+| Phase 1: Integration   | ✅ Complete | 6 hours    | 100%       |
+| Phase 2: UI + Fixes    | ✅ Complete | 4 hours    | 100%       |
+| Phase 2.5: Med/Hard AI | ✅ Complete | 6 hours    | 100%       |
+| Phase 3: Testing       | ⏳ Pending  | 0 hours    | 30%        |
+| Phase 4: Mid-game Bots | ⏳ Pending  | 0 hours    | 0%         |
+| Phase 5: Monitoring    | ⏳ Pending  | 0 hours    | 0%         |
 
 **Total Time Invested:** ~24 hours  
 **Remaining for Full MVP:** ~24-34 hours (testing + mid-game replacement + monitoring)
