@@ -45,6 +45,8 @@ export interface Player {
   label: string;
   /** Player name */
   name: string;
+  /** Player type (HUMAN or bot difficulty) - optional for backwards compatibility */
+  playerType?: "HUMAN" | "BOT_EASY" | "BOT_MEDIUM" | "BOT_HARD";
 }
 
 // ============================================================================

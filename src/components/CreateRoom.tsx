@@ -19,18 +19,48 @@ interface CreateRoomProps {
   onCancel: () => void;
 }
 
+type PlayerSlotType =
+  | "EMPTY"
+  | "HUMAN"
+  | "BOT_EASY"
+  | "BOT_MEDIUM"
+  | "BOT_HARD";
+
 export function CreateRoom({ onCancel }: CreateRoomProps) {
   const router = useRouter();
   const [selectedMode, setSelectedMode] = useState<GameMode>("FOUR_PLAYER");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [allowBots, setAllowBots] = useState(false);
+  const [playerSlots, setPlayerSlots] = useState<PlayerSlotType[]>([
+    "HUMAN",
+    "EMPTY",
+    "EMPTY",
+    "EMPTY",
+  ]);
 
   const handleCreateRoom = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const result = await createRoom(selectedMode);
+      const config = getGameModeConfig(selectedMode);
+      const maxPlayers = config.maxPlayers;
+
+      // Validate player count
+      const filledSlots = playerSlots
+        .slice(0, maxPlayers)
+        .filter((s) => s !== "EMPTY");
+      if (filledSlots.length < config.minPlayers) {
+        setError(`Need at least ${config.minPlayers} players to start`);
+        setLoading(false);
+        return;
+      }
+
+      const result = await createRoom(
+        selectedMode,
+        allowBots ? playerSlots.slice(0, maxPlayers) : undefined
+      );
 
       if ("error" in result) {
         setError(result.error);
@@ -40,13 +70,49 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
           `room_${result.code}_playerId`,
           String(result.playerId)
         );
-        // Auto-redirect to lobby instead of showing code screen
+        // Auto-redirect to lobby
         router.push(`/room/${result.code}/lobby`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create room");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updatePlayerSlot = (index: number, type: PlayerSlotType) => {
+    const newSlots = [...playerSlots];
+    newSlots[index] = type;
+    setPlayerSlots(newSlots);
+  };
+
+  const getSlotLabel = (type: PlayerSlotType): string => {
+    switch (type) {
+      case "EMPTY":
+        return "Empty";
+      case "HUMAN":
+        return "Human";
+      case "BOT_EASY":
+        return "Bot (Easy)";
+      case "BOT_MEDIUM":
+        return "Bot (Medium)";
+      case "BOT_HARD":
+        return "Bot (Hard)";
+    }
+  };
+
+  const getSlotEmoji = (type: PlayerSlotType): string => {
+    switch (type) {
+      case "EMPTY":
+        return "⭕";
+      case "HUMAN":
+        return "👤";
+      case "BOT_EASY":
+        return "🤖";
+      case "BOT_MEDIUM":
+        return "🤖";
+      case "BOT_HARD":
+        return "🤖";
     }
   };
 
@@ -113,6 +179,108 @@ export function CreateRoom({ onCancel }: CreateRoomProps) {
                 </div>
               </button>
             </div>
+          </div>
+
+          {/* Bot Configuration Section */}
+          <div className="space-y-4 pt-4 border-t border-slate-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white">
+                  🤖 Bot Players
+                </h2>
+                <p className="text-sm text-slate-400">
+                  Add AI opponents to your game
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setAllowBots(!allowBots);
+                  if (!allowBots) {
+                    // Reset slots when enabling bots
+                    setPlayerSlots(["HUMAN", "EMPTY", "EMPTY", "EMPTY"]);
+                  }
+                }}
+                disabled={loading}
+                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                  allowBots
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                }`}
+              >
+                {allowBots ? "Enabled" : "Disabled"}
+              </button>
+            </div>
+
+            {allowBots && (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-400">
+                  Configure each player slot (Player 1 is always you):
+                </p>
+
+                {[0, 1, 2, 3]
+                  .slice(0, getGameModeConfig(selectedMode).maxPlayers)
+                  .map((index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700"
+                    >
+                      <div className="text-2xl">
+                        {getSlotEmoji(playerSlots[index])}
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-white">
+                          Player {index + 1}
+                          {index === 0 && (
+                            <span className="ml-2 text-xs text-blue-400">
+                              (You)
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          {getSlotLabel(playerSlots[index])}
+                        </div>
+                      </div>
+
+                      {index === 0 ? (
+                        // Player 1 is always the host (human)
+                        <div className="px-3 py-1 bg-slate-700 rounded text-xs text-slate-400">
+                          Host
+                        </div>
+                      ) : (
+                        // Other slots can be configured
+                        <select
+                          value={playerSlots[index]}
+                          onChange={(e) =>
+                            updatePlayerSlot(
+                              index,
+                              e.target.value as PlayerSlotType
+                            )
+                          }
+                          disabled={loading}
+                          className="px-3 py-1.5 bg-slate-700 text-white text-sm rounded border border-slate-600 focus:border-blue-500 focus:outline-none"
+                        >
+                          <option value="EMPTY">Empty Slot</option>
+                          <option value="HUMAN">Human</option>
+                          <option value="BOT_EASY">Bot - Easy</option>
+                          <option value="BOT_MEDIUM" disabled>
+                            Bot - Medium (Soon)
+                          </option>
+                          <option value="BOT_HARD" disabled>
+                            Bot - Hard (Soon)
+                          </option>
+                        </select>
+                      )}
+                    </div>
+                  ))}
+
+                <div className="p-3 bg-blue-900/20 border border-blue-700/30 rounded-lg">
+                  <p className="text-xs text-blue-300">
+                    💡 <strong>Tip:</strong> Bots will play automatically when
+                    it&apos;s their turn. Perfect for testing or playing solo!
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {error && (

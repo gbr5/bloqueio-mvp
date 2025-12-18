@@ -89,8 +89,8 @@ export function WaitingLobby({ roomCode }: WaitingLobbyProps) {
     const config = getGameModeConfig(room.gameMode);
     const playerCount = room.players.length;
 
-    // If room is full and we're the host, auto-start
-    if (playerCount === config.maxPlayers && myPlayerId === room.hostId) {
+    // If room is full and we're the host (player 0), auto-start
+    if (playerCount === config.maxPlayers && myPlayerId === 0) {
       handleStartGame();
     }
   }, [room, myPlayerId, starting]);

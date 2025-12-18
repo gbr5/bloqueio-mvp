@@ -647,9 +647,9 @@ export default function BloqueioPage({
     // Border cells (0 or SIZE-1) cannot be clicked to place barriers
     if (
       clickRow === 0 ||
-      clickRow === SIZE - 1 ||
+      clickRow === SIZE ||
       clickCol === 0 ||
-      clickCol === SIZE - 1
+      clickCol === SIZE
     ) {
       // Silently ignore clicks on border cells - no error needed
       return {
@@ -681,52 +681,28 @@ export default function BloqueioPage({
       // baseRow can be 0-9 (allows blocking up to border row 10)
       baseRow = clickRow - 1; // Clicking row X → baseRow X-1
 
-      // baseCol must be 1-8 (cannot be 0 or 9 - borders)
+      // baseCol can be 0-9 (allows barriers at border intersections)
       // Clicks at col 8 and 9 both should map to baseCol 8
-      if (clickCol >= INNER_SIZE - 1) {
+      if (clickCol >= INNER_SIZE) {
         // Clicking col 8 or 9 → baseCol 8 (rightmost valid)
         baseCol = SIZE - 3; // 8
       } else {
-        // Clicking col 1-7 → baseCol 1-7 (but clamp minimum to 1)
-        baseCol = Math.max(1, clickCol - 1);
-      }
-
-      // Validate baseCol is not at borders
-      if (baseCol < 1 || baseCol >= SIZE - 2) {
-        if (!silent) toast.error("Não pode colocar barreira na borda");
-        return {
-          ok: false,
-          baseRow: 0,
-          baseCol: 0,
-          orientation: wallOrientation,
-          edgesToAdd: [],
-        };
+        // Clicking col 1-7 → baseCol 0-7 (clamp to 0 minimum)
+        baseCol = Math.max(0, clickCol);
       }
     } else {
       // Vertical: blocks vertical edges between baseCol and baseCol+1
       // baseCol can be 0-9 (allows blocking up to border col 10)
       baseCol = clickCol - 1; // Clicking col X → baseCol X-1
 
-      // baseRow must be 1-8 (cannot be 0 or 9 - borders)
+      // baseRow can be 0-9 (allows barriers at border intersections)
       // Clicks at row 8 and 9 both should map to baseRow 8
-      if (clickRow >= INNER_SIZE - 1) {
+      if (clickRow >= INNER_SIZE) {
         // Clicking row 8 or 9 → baseRow 8 (bottommost valid)
         baseRow = SIZE - 3; // 8
       } else {
-        // Clicking row 1-7 → baseRow 1-7 (but clamp minimum to 1)
-        baseRow = Math.max(1, clickRow - 1);
-      }
-
-      // Validate baseRow is not at borders
-      if (baseRow < 1 || baseRow >= SIZE - 2) {
-        if (!silent) toast.error("Não pode colocar barreira na borda");
-        return {
-          ok: false,
-          baseRow: 0,
-          baseCol: 0,
-          orientation: wallOrientation,
-          edgesToAdd: [],
-        };
+        // Clicking row 1-7 → baseRow 0-7 (clamp to 0 minimum)
+        baseRow = Math.max(0, clickRow);
       }
     }
 
@@ -1251,12 +1227,18 @@ export default function BloqueioPage({
       return `${p.name} venceu!`;
     }
 
-    let baseText = `Vez de ${currentPlayer?.name} (${
-      mode === "move" ? "mover peão" : "colocar barreira"
-    })`;
+    // Check if current player is a bot
+    const isBot =
+      currentPlayer?.playerType && currentPlayer.playerType !== "HUMAN";
 
-    // Add hint for mobile preview mode
-    if (isMobile && mode === "wall" && mobilePreviewBarrier) {
+    let baseText = isBot
+      ? `🤖 Bot está pensando... (${currentPlayer?.name})`
+      : `Vez de ${currentPlayer?.name} (${
+          mode === "move" ? "mover peão" : "colocar barreira"
+        })`;
+
+    // Add hint for mobile preview mode (only for human players)
+    if (!isBot && isMobile && mode === "wall" && mobilePreviewBarrier) {
       baseText += " - Toque para reposicionar";
     }
 
@@ -1613,6 +1595,13 @@ export default function BloqueioPage({
                       }}
                     >
                       {p?.name}
+                      {p.playerType && p.playerType !== "HUMAN" && (
+                        <span
+                          style={{ marginLeft: "0.5rem", fontSize: "0.875rem" }}
+                        >
+                          🤖
+                        </span>
+                      )}
                     </span>
                     <span style={{ color: "#9ca3af", marginLeft: "auto" }}>
                       Barreiras: {p.wallsLeft}/{modeConfig.wallsPerPlayer}
