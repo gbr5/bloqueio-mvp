@@ -149,7 +149,13 @@ export async function createRoom(
           slotType === "BOT_MEDIUM" ||
           slotType === "BOT_HARD"
         ) {
-          const botConfig = PLAYER_CONFIGS[i];
+          // For 2-player mode, use facing positions (player 0 vs player 2)
+          // For 4-player mode, use standard positions
+          const botConfig =
+            gameMode === "TWO_PLAYER" && i === 1
+              ? PLAYER_CONFIGS[2] // Use player 2 position (bottom, facing player 0 at top)
+              : PLAYER_CONFIGS[i];
+
           playersToCreate.push({
             playerId: i,
             sessionId: null, // Bots don't have sessions

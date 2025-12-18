@@ -103,12 +103,14 @@ function getValidNeighbors(
     const newRow = row + dr;
     const newCol = col + dc;
 
-    // Check bounds
+    // CRITICAL: Only allow movement within internal cells (1-9)
+    // Border cells (0 and 10) can only be reached as final winning move
+    const INNER_SIZE = 9;
     if (
-      newRow < 0 ||
-      newRow > BOARD_SIZE - 1 ||
-      newCol < 0 ||
-      newCol > BOARD_SIZE - 1
+      newRow < 1 ||
+      newRow > INNER_SIZE ||
+      newCol < 1 ||
+      newCol > INNER_SIZE
     ) {
       continue;
     }

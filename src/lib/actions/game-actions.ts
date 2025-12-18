@@ -523,7 +523,7 @@ export async function startGame(
     });
 
     if (!room) return { error: "Room not found" };
-    if (room.hostId !== sessionId) {
+    if (room.hostSessionId !== sessionId) {
       return { error: "Only host can start the game" };
     }
 

@@ -60,6 +60,13 @@ export async function afterMoveCommit(roomCode: string): Promise<void> {
   // Only schedule if bot and not already scheduled
   if (currentPlayer.playerType !== "HUMAN") {
     await scheduleBotMove(roomCode, room.currentTurn, room.turnNumber);
+
+    // IMMEDIATE BOT RESPONSE: Process the job right away instead of waiting for cron
+    const { processPendingBotJobs } = await import("@/lib/bot/worker");
+    // Process in background (don't await to avoid blocking the response)
+    processPendingBotJobs().catch((err) =>
+      console.error("[Bot] Error processing immediate bot move:", err)
+    );
   }
 }
 
@@ -75,11 +82,20 @@ export async function onGameStart(roomCode: string): Promise<void> {
 
   if (!room) return;
 
-  // If starting player is bot, schedule job
+  // If starting player is bot, schedule job and process immediately
   const startingPlayer = room.players.find(
     (p) => p.playerId === room.currentTurn
   );
   if (startingPlayer && startingPlayer.playerType !== "HUMAN") {
     await scheduleBotMove(roomCode, room.currentTurn, room.turnNumber);
+
+    // IMMEDIATE BOT RESPONSE: Process the job right away
+    const { processPendingBotJobs } = await import("@/lib/bot/worker");
+    processPendingBotJobs().catch((err) =>
+      console.error(
+        "[Bot] Error processing immediate bot move on game start:",
+        err
+      )
+    );
   }
 }
