@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import { JSX, useState, useEffect, useRef, useCallback } from "react";
+import { JSX, useState, useEffect } from "react";
 import { toast } from "@/lib/toast";
 import {
   Modal,
@@ -408,13 +408,6 @@ export default function BloqueioPage({
     row: number;
     col: number;
   } | null>(null);
-  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const mobilePreviewRef = useRef<{ row: number; col: number } | null>(null);
-  const wallOrientationRef = useRef<Orientation>("H");
-
-  // Keep refs in sync with state
-  mobilePreviewRef.current = mobilePreviewBarrier;
-  wallOrientationRef.current = wallOrientation;
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
 
@@ -444,87 +437,8 @@ export default function BloqueioPage({
     } else if (mode !== "wall") {
       // Clear preview when exiting wall mode
       setMobilePreviewBarrier(null);
-      if (inactivityTimeoutRef.current) {
-        clearTimeout(inactivityTimeoutRef.current);
-        inactivityTimeoutRef.current = null;
-      }
     }
   }, [mode, isMobile]);
-
-  // Start inactivity timer - triggers confirmation modal after 2 seconds
-  const startInactivityTimer = useCallback(() => {
-    // Clear existing timeout
-    if (inactivityTimeoutRef.current) {
-      clearTimeout(inactivityTimeoutRef.current);
-    }
-
-    // Start new 2-second timeout
-    inactivityTimeoutRef.current = setTimeout(() => {
-      // Use refs to get current values (avoids stale closure)
-      const preview = mobilePreviewRef.current;
-      const orientation = wallOrientationRef.current;
-      if (!preview) return;
-
-      // Calculate base position (same logic as checkWallPlacement)
-      const clickRow = preview.row;
-      const clickCol = preview.col;
-      let baseRow: number;
-      let baseCol: number;
-
-      if (orientation === "H") {
-        if (clickRow === INNER_SIZE) {
-          baseRow = INNER_SIZE;
-        } else {
-          baseRow = Math.max(0, clickRow - 1);
-        }
-        baseCol = Math.max(0, Math.min(clickCol - 1, SIZE - 3));
-        if (clickCol >= INNER_SIZE - 1) {
-          baseCol = SIZE - 3;
-        }
-      } else {
-        if (clickCol === INNER_SIZE) {
-          baseCol = INNER_SIZE;
-        } else {
-          baseCol = Math.max(0, clickCol - 1);
-        }
-        baseRow = Math.max(0, Math.min(clickRow - 1, SIZE - 3));
-        if (clickRow >= INNER_SIZE - 1) {
-          baseRow = SIZE - 3;
-        }
-      }
-
-      // Calculate edges
-      const edgesToAdd: string[] = [];
-      if (orientation === "H") {
-        edgesToAdd.push(edgeKey(baseRow, baseCol, baseRow + 1, baseCol));
-        edgesToAdd.push(
-          edgeKey(baseRow, baseCol + 1, baseRow + 1, baseCol + 1)
-        );
-      } else {
-        edgesToAdd.push(edgeKey(baseRow, baseCol, baseRow, baseCol + 1));
-        edgesToAdd.push(
-          edgeKey(baseRow + 1, baseCol, baseRow + 1, baseCol + 1)
-        );
-      }
-
-      // Set pending barrier and show confirmation modal
-      setPendingBarrier({ baseRow, baseCol, orientation, edgesToAdd });
-      setShowBarrierConfirmation(true);
-    }, 2000);
-  }, []);
-
-  // Reset timer whenever preview position changes
-  useEffect(() => {
-    if (mode === "wall" && isMobile && mobilePreviewBarrier) {
-      startInactivityTimer();
-    }
-
-    return () => {
-      if (inactivityTimeoutRef.current) {
-        clearTimeout(inactivityTimeoutRef.current);
-      }
-    };
-  }, [mode, isMobile, mobilePreviewBarrier, startInactivityTimer]);
 
   // Helper to update game state (works for both controlled and uncontrolled)
   function updateGameState(updates: Partial<GameSnapshot>) {
@@ -617,16 +531,18 @@ export default function BloqueioPage({
   function checkWallPlacement(
     clickRow: number,
     clickCol: number,
-    opts?: { silent?: boolean }
+    opts?: { silent?: boolean; orientation?: Orientation }
   ): WallCheckResult {
     const silent = opts?.silent ?? false;
+    // Allow passing orientation explicitly (needed for stale closure in setTimeout)
+    const effectiveOrientation = opts?.orientation ?? wallOrientation;
 
     if (winner !== null) {
       return {
         ok: false,
         baseRow: 0,
         baseCol: 0,
-        orientation: wallOrientation,
+        orientation: effectiveOrientation,
         edgesToAdd: [],
       };
     }
@@ -637,7 +553,7 @@ export default function BloqueioPage({
         ok: false,
         baseRow: 0,
         baseCol: 0,
-        orientation: wallOrientation,
+        orientation: effectiveOrientation,
         edgesToAdd: [],
       };
     }
@@ -656,7 +572,7 @@ export default function BloqueioPage({
         ok: false,
         baseRow: 0,
         baseCol: 0,
-        orientation: wallOrientation,
+        orientation: effectiveOrientation,
         edgesToAdd: [],
       };
     }
@@ -676,7 +592,7 @@ export default function BloqueioPage({
     let baseRow: number;
     let baseCol: number;
 
-    if (wallOrientation === "H") {
+    if (effectiveOrientation === "H") {
       // Horizontal: blocks horizontal edges between baseRow and baseRow+1
       // baseRow can be 0-9 (allows blocking up to border row 10)
       baseRow = clickRow - 1; // Clicking row X → baseRow X-1
@@ -707,7 +623,7 @@ export default function BloqueioPage({
     }
 
     const edgesToAdd: string[] = [];
-    const orientation = wallOrientation;
+    const orientation = effectiveOrientation;
 
     if (orientation === "H") {
       // barreira horizontal entre baseRow e baseRow+1, cobrindo duas colunas
@@ -916,16 +832,55 @@ export default function BloqueioPage({
   function cancelBarrierPlacement() {
     setPendingBarrier(null);
     setShowBarrierConfirmation(false);
+  }
 
-    // On mobile, cancel returns to move mode
-    if (isMobile) {
-      setMode("move");
-      setMobilePreviewBarrier(null);
-      if (inactivityTimeoutRef.current) {
-        clearTimeout(inactivityTimeoutRef.current);
-        inactivityTimeoutRef.current = null;
-      }
-    }
+  // Confirm mobile barrier placement directly (no modal)
+  function confirmMobileBarrierPlacement() {
+    if (!mobilePreviewBarrier) return;
+    if (!currentPlayer) return;
+
+    const result = checkWallPlacement(
+      mobilePreviewBarrier.row,
+      mobilePreviewBarrier.col,
+      { silent: false }
+    );
+    if (!result.ok) return;
+
+    const { baseRow, baseCol, orientation, edgesToAdd } = result;
+
+    pushSnapshot();
+
+    const newBlocked = new Set(blockedEdges);
+    edgesToAdd.forEach((e) => newBlocked.add(e));
+
+    const newBarrier: Barrier = {
+      row: baseRow,
+      col: baseCol,
+      orientation,
+      id: `${baseRow}-${baseCol}-${orientation}-${Date.now()}-${Math.random()}`,
+      placedBy: currentPlayer.id,
+    };
+
+    const newPlayers = players.map((p) =>
+      p.id === currentPlayer.id ? { ...p, wallsLeft: p.wallsLeft - 1 } : p
+    );
+
+    updateGameState({
+      players: newPlayers,
+      blockedEdges: Array.from(newBlocked),
+      barriers: [...barriers, newBarrier],
+      currentPlayerId: nextPlayerId(currentPlayerId),
+    });
+
+    // Reset state
+    setMobilePreviewBarrier(null);
+    setMode("move");
+  }
+
+  // Cancel mobile barrier placement
+  function cancelMobileBarrierPlacement() {
+    setMobilePreviewBarrier(null);
+    setMode("move");
   }
 
   function handleRestart() {
@@ -1231,16 +1186,11 @@ export default function BloqueioPage({
     const isBot =
       currentPlayer?.playerType && currentPlayer.playerType !== "HUMAN";
 
-    let baseText = isBot
+    const baseText = isBot
       ? `🤖 Bot está pensando... (${currentPlayer?.name})`
       : `Vez de ${currentPlayer?.name} (${
           mode === "move" ? "mover peão" : "colocar barreira"
         })`;
-
-    // Add hint for mobile preview mode (only for human players)
-    if (!isBot && isMobile && mode === "wall" && mobilePreviewBarrier) {
-      baseText += " - Toque para reposicionar";
-    }
 
     return baseText;
   })();
@@ -1490,10 +1440,7 @@ export default function BloqueioPage({
                 >
                   <button
                     type="button"
-                    onClick={() => {
-                      setWallOrientation("H");
-                      if (isMobile && mode === "wall") startInactivityTimer();
-                    }}
+                    onClick={() => setWallOrientation("H")}
                     style={{
                       padding: "0.35rem 0.75rem",
                       borderRadius: 999,
@@ -1510,14 +1457,11 @@ export default function BloqueioPage({
                       cursor: "pointer",
                     }}
                   >
-                    Barreira horizontal
+                    Horizontal
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setWallOrientation("V");
-                      if (isMobile && mode === "wall") startInactivityTimer();
-                    }}
+                    onClick={() => setWallOrientation("V")}
                     style={{
                       padding: "0.35rem 0.75rem",
                       borderRadius: 999,
@@ -1534,8 +1478,43 @@ export default function BloqueioPage({
                       cursor: "pointer",
                     }}
                   >
-                    Barreira vertical
+                    Vertical
                   </button>
+                  {isMobile && mobilePreviewBarrier && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={confirmMobileBarrierPlacement}
+                        style={{
+                          padding: "0.35rem 0.75rem",
+                          borderRadius: 999,
+                          border: "2px solid #22c55e",
+                          background: "rgba(34,197,94,0.15)",
+                          color: "#e5e7eb",
+                          fontSize: "0.8rem",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Confirmar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelMobileBarrierPlacement}
+                        style={{
+                          padding: "0.35rem 0.75rem",
+                          borderRadius: 999,
+                          border: "1px solid #ef4444",
+                          background: "rgba(239,68,68,0.1)",
+                          color: "#e5e7eb",
+                          fontSize: "0.8rem",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
